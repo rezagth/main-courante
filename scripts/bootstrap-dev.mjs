@@ -46,6 +46,7 @@ const defaultTypes = [
   { code: 'OBSERVATION', label: 'Observation' },
   { code: 'INTERVENTION', label: 'Intervention' },
 ];
+const createSampleEntries = (process.env.BOOTSTRAP_SAMPLE_ENTRIES ?? 'true') === 'true';
 
 async function run() {
   const passwordHash = await hashArgon2(adminPassword);
@@ -255,6 +256,7 @@ async function run() {
     },
   ];
 
+  const createdRoleUsers = {};
   for (const item of roleUsers) {
     const userPasswordHash = await hashArgon2(item.password);
     const roleUser = await prisma.user.upsert({
@@ -301,6 +303,49 @@ async function run() {
           startedAt: defaultValidFrom,
         },
       });
+    }
+    createdRoleUsers[item.roleCode] = roleUser;
+  }
+
+  if (createSampleEntries) {
+    const entriesCount = await prisma.entreeMainCourante.count({
+      where: { tenantId: tenant.id, deletedAt: null },
+    });
+
+    if (entriesCount === 0) {
+      const types = await prisma.typeEvenement.findMany({
+        where: { tenantId: tenant.id, isActive: true },
+        select: { id: true, code: true },
+      });
+      const typeIdByCode = Object.fromEntries(types.map((t) => [t.code, t.id]));
+
+      const actors = [createdRoleUsers.AGENT?.id, createdRoleUsers.CHEF_EQUIPE?.id].filter(Boolean);
+      const templates = [
+        { code: 'RONDE', description: 'Ronde completee sans anomalie', localisation: 'Niveau 1 - Couloir A', gravite: 'INFO' },
+        { code: 'ALARME', description: 'Declenchement detecteur fumee', localisation: 'Sous-sol - Local technique', gravite: 'ELEVEE' },
+        { code: 'ANOMALIE', description: 'Porte coupe-feu bloquee ouverte', localisation: 'Escalier B', gravite: 'MOYENNE' },
+        { code: 'OBSERVATION', description: 'Extincteur a verifier', localisation: 'Hall principal', gravite: 'FAIBLE' },
+        { code: 'INTERVENTION', description: 'Levee de doute effectuee', localisation: 'Parking Ouest', gravite: 'MOYENNE' },
+      ];
+
+      const now = Date.now();
+      const rows = Array.from({ length: 30 }).map((_, idx) => {
+        const tpl = templates[idx % templates.length];
+        return {
+          tenantId: tenant.id,
+          siteId: site.id,
+          teamId: team.id,
+          userId: actors[idx % actors.length],
+          typeEvenementId: typeIdByCode[tpl.code],
+          timestamp: new Date(now - idx * 40 * 60 * 1000),
+          description: `${tpl.description} (#${idx + 1})`,
+          localisation: tpl.localisation,
+          gravite: tpl.gravite,
+        };
+      });
+
+      await prisma.entreeMainCourante.createMany({ data: rows });
+      console.log(`Entrees de demo creees: ${rows.length}`);
     }
   }
 

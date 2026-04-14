@@ -32,6 +32,34 @@ const TENANT_MODELS = new Set([
   'BackupRun',
 ]);
 
+function findTenantIdDeep(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findTenantIdDeep(item);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const obj = value as Record<string, unknown>;
+  const direct = obj.tenantId;
+  if (typeof direct === 'string' && direct.length > 0) {
+    return direct;
+  }
+
+  for (const key of Object.keys(obj)) {
+    const found = findTenantIdDeep(obj[key]);
+    if (found) return found;
+  }
+  return null;
+}
+
+function resolveTenantIdFromArgs(args: Record<string, unknown> | undefined): string | null {
+  if (!args) return null;
+  return findTenantIdDeep(args);
+}
+
 const dbUrl = process.env.DATABASE_URL;
 if (!dbUrl) {
   throw new Error('DATABASE_URL is required for Prisma runtime');
@@ -61,11 +89,10 @@ const prismaBase = prismaAdmin.$extends({
         }
 
         const ctx = tenantStorage.getStore();
-        if (!ctx?.tenantId) {
+        const tenantId = ctx?.tenantId ?? resolveTenantIdFromArgs(args as Record<string, unknown> | undefined);
+        if (!tenantId) {
           throw new Error(`Missing tenant context for model ${model}`);
         }
-
-        const tenantId = ctx.tenantId;
         const whereOps = new Set([
           'findUnique',
           'findUniqueOrThrow',

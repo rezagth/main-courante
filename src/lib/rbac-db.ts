@@ -1,4 +1,4 @@
-import { prisma, withTenantContext } from '@/lib/prisma';
+import { prismaAdmin } from '@/lib/prisma';
 
 type PermissionContext = {
   tenantId: string;
@@ -10,34 +10,33 @@ type PermissionContext = {
 
 export async function hasDynamicPermission(ctx: PermissionContext): Promise<boolean> {
   const now = new Date();
-  return withTenantContext(ctx.tenantId, async () => {
-    const assignments = await prisma.userRoleAssignment.findMany({
-      where: {
-        userId: ctx.userId,
-        validFrom: { lte: now },
-        OR: [{ validTo: null }, { validTo: { gte: now } }],
-      },
-      include: {
-        role: {
-          include: {
-            rolePermissions: {
-              where: {
-                allowed: true,
-                permission: { code: ctx.permission },
-              },
-              include: { permission: true },
+  const assignments = await prismaAdmin.userRoleAssignment.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      userId: ctx.userId,
+      validFrom: { lte: now },
+      OR: [{ validTo: null }, { validTo: { gte: now } }],
+    },
+    include: {
+      role: {
+        include: {
+          rolePermissions: {
+            where: {
+              allowed: true,
+              permission: { code: ctx.permission },
             },
+            include: { permission: true },
           },
         },
       },
-    });
+    },
+  });
 
-    return assignments.some((assignment) => {
-      const siteOk = !assignment.siteId || assignment.siteId === ctx.siteId;
-      const teamOk = !assignment.teamId || assignment.teamId === ctx.teamId;
-      const permOk = assignment.role.rolePermissions.length > 0;
-      return siteOk && teamOk && permOk;
-    });
+  return assignments.some((assignment: (typeof assignments)[number]) => {
+    const siteOk = !assignment.siteId || assignment.siteId === ctx.siteId;
+    const teamOk = !assignment.teamId || assignment.teamId === ctx.teamId;
+    const permOk = assignment.role.rolePermissions.length > 0;
+    return siteOk && teamOk && permOk;
   });
 }
 
@@ -46,18 +45,16 @@ export async function assertResourceBelongsToTenant(
   resource: 'entry' | 'site' | 'team' | 'user',
   id: string,
 ) {
-  return withTenantContext(tenantId, async () => {
-    switch (resource) {
-      case 'entry':
-        return prisma.entreeMainCourante.findFirstOrThrow({ where: { id } });
-      case 'site':
-        return prisma.site.findFirstOrThrow({ where: { id } });
-      case 'team':
-        return prisma.team.findFirstOrThrow({ where: { id } });
-      case 'user':
-        return prisma.user.findFirstOrThrow({ where: { id } });
-      default:
-        throw new Error('Unsupported resource');
-    }
-  });
+  switch (resource) {
+    case 'entry':
+      return prismaAdmin.entreeMainCourante.findFirstOrThrow({ where: { id, tenantId } });
+    case 'site':
+      return prismaAdmin.site.findFirstOrThrow({ where: { id, tenantId } });
+    case 'team':
+      return prismaAdmin.team.findFirstOrThrow({ where: { id, tenantId } });
+    case 'user':
+      return prismaAdmin.user.findFirstOrThrow({ where: { id, tenantId } });
+    default:
+      throw new Error('Unsupported resource');
+  }
 }

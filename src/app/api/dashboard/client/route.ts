@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAnyRole } from '@/lib/authorization';
 import { cachedJson } from '@/lib/cache';
-import { prisma, withTenantContext } from '@/lib/prisma';
+import { prismaAdmin } from '@/lib/prisma';
 
 function buildWhere(searchParams: URLSearchParams) {
   const now = new Date();
@@ -48,11 +48,11 @@ export async function GET(request: Request) {
   const params = buildWhere(searchParams);
   const key = `analytics:client:${user.tenantId}:${JSON.stringify(params)}`;
 
-  const payload = await cachedJson(key, async () =>
-    withTenantContext(user.tenantId, async () => {
+  const payload = await cachedJson(key, async () => {
+      const scopedWhere = { tenantId: user.tenantId, ...params.where };
       const [rows, total, bySite, byType, byAgent, trend] = await Promise.all([
-        prisma.entreeMainCourante.findMany({
-          where: params.where,
+        prismaAdmin.entreeMainCourante.findMany({
+          where: scopedWhere,
           include: {
             site: { select: { name: true } },
             user: { select: { firstName: true, lastName: true } },
@@ -62,43 +62,43 @@ export async function GET(request: Request) {
           skip: params.page * params.take,
           take: params.take,
         }),
-        prisma.entreeMainCourante.count({ where: params.where }),
-        prisma.entreeMainCourante.groupBy({
+        prismaAdmin.entreeMainCourante.count({ where: scopedWhere }),
+        prismaAdmin.entreeMainCourante.groupBy({
           by: ['siteId'],
-          where: params.where,
+          where: scopedWhere,
           _count: { _all: true },
         }),
-        prisma.entreeMainCourante.groupBy({
+        prismaAdmin.entreeMainCourante.groupBy({
           by: ['typeEvenementId'],
-          where: params.where,
+          where: scopedWhere,
           _count: { _all: true },
         }),
-        prisma.entreeMainCourante.groupBy({
+        prismaAdmin.entreeMainCourante.groupBy({
           by: ['userId'],
-          where: params.where,
+          where: scopedWhere,
           _count: { _all: true },
         }),
-        prisma.entreeMainCourante.findMany({
-          where: params.where,
+        prismaAdmin.entreeMainCourante.findMany({
+          where: scopedWhere,
           select: { timestamp: true },
           orderBy: { timestamp: 'asc' },
         }),
       ]);
 
-      const sites = await prisma.site.findMany({
-        where: { id: { in: bySite.map((x) => x.siteId) } },
+      const sites = await prismaAdmin.site.findMany({
+        where: { tenantId: user.tenantId, id: { in: bySite.map((x) => x.siteId) } },
         select: { id: true, name: true },
       });
       const siteMap = Object.fromEntries(sites.map((s) => [s.id, s.name]));
 
-      const types = await prisma.typeEvenement.findMany({
-        where: { id: { in: byType.map((x) => x.typeEvenementId) } },
+      const types = await prismaAdmin.typeEvenement.findMany({
+        where: { tenantId: user.tenantId, id: { in: byType.map((x) => x.typeEvenementId) } },
         select: { id: true, label: true },
       });
       const typeMap = Object.fromEntries(types.map((t) => [t.id, t.label]));
 
-      const users = await prisma.user.findMany({
-        where: { id: { in: byAgent.map((x) => x.userId) } },
+      const users = await prismaAdmin.user.findMany({
+        where: { tenantId: user.tenantId, id: { in: byAgent.map((x) => x.userId) } },
         select: { id: true, firstName: true, lastName: true },
       });
       const userMap = Object.fromEntries(
@@ -136,8 +136,7 @@ export async function GET(request: Request) {
         trend: trend.map((x) => ({ timestamp: x.timestamp })),
         heatmap,
       };
-    }),
-  );
+  });
 
   return NextResponse.json(payload);
 }

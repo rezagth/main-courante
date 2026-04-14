@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/authorization';
-import { prisma, withTenantContext } from '@/lib/prisma';
+import { prismaAdmin } from '@/lib/prisma';
 import { logAuditEvent } from '@/lib/audit';
 import { assertTenantQuota, QuotaExceededError } from '@/lib/quotas';
 
@@ -22,21 +22,20 @@ export async function GET(request: Request) {
   const now = new Date();
   const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-  const data = await withTenantContext(user.tenantId, async () =>
-    prisma.entreeMainCourante.findMany({
-      where: {
-        deletedAt: null,
-        timestamp: { gte: startOfDay },
-      },
-      include: {
-        typeEvenement: { select: { label: true } },
-        user: { select: { firstName: true, lastName: true } },
-      },
-      orderBy: { timestamp: 'desc' },
-      skip: page * take,
-      take,
-    }),
-  );
+  const data = await prismaAdmin.entreeMainCourante.findMany({
+    where: {
+      tenantId: user.tenantId,
+      deletedAt: null,
+      timestamp: { gte: startOfDay },
+    },
+    include: {
+      typeEvenement: { select: { label: true } },
+      user: { select: { firstName: true, lastName: true } },
+    },
+    orderBy: { timestamp: 'desc' },
+    skip: page * take,
+    take,
+  });
 
   return NextResponse.json({ data, nextPage: data.length === take ? page + 1 : null });
 }
@@ -59,33 +58,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Type et description requis' }, { status: 400 });
   }
 
-  const activeMembership = await withTenantContext(user.tenantId, async () =>
-    prisma.teamMember.findFirst({
-      where: { userId: user.id, endedAt: null },
-      include: { team: true },
-      orderBy: { startedAt: 'desc' },
-    }),
-  );
+  const activeMembership = await prismaAdmin.teamMember.findFirst({
+    where: { tenantId: user.tenantId, userId: user.id, endedAt: null },
+    include: { team: true },
+    orderBy: { startedAt: 'desc' },
+  });
   if (!activeMembership) {
     return NextResponse.json({ error: "L'utilisateur n'a pas d'equipe active" }, { status: 400 });
   }
 
-  const created = await withTenantContext(user.tenantId, async () =>
-    prisma.entreeMainCourante.create({
-      data: {
-        tenantId: user.tenantId,
-        siteId: activeMembership.team.siteId,
-        teamId: activeMembership.teamId,
-        userId: user.id,
-        typeEvenementId: payload.typeEvenementId,
-        timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
-        description: payload.description.trim(),
-        localisation: payload.localisation?.trim() || null,
-        gravite: payload.gravite ?? null,
-        photoUrl: payload.photoUrl ?? null,
-      },
-    }),
-  );
+  const created = await prismaAdmin.entreeMainCourante.create({
+    data: {
+      tenantId: user.tenantId,
+      siteId: activeMembership.team.siteId,
+      teamId: activeMembership.teamId,
+      userId: user.id,
+      typeEvenementId: payload.typeEvenementId,
+      timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+      description: payload.description.trim(),
+      localisation: payload.localisation?.trim() || null,
+      gravite: payload.gravite ?? null,
+      photoUrl: payload.photoUrl ?? null,
+    },
+  });
 
   await logAuditEvent({
     tenantId: user.tenantId,

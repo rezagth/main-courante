@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAnyRole } from '@/lib/authorization';
 import { cachedJson } from '@/lib/cache';
-import { prisma, withTenantContext } from '@/lib/prisma';
+import { prismaAdmin } from '@/lib/prisma';
 
 function dateRange(searchParams: URLSearchParams) {
   const from = searchParams.get('from');
@@ -23,9 +23,9 @@ export async function GET(request: Request) {
   const inactivityMinutes = Number(searchParams.get('inactivityMinutes') ?? '30');
   const cacheKey = `analytics:chef:${user.tenantId}:${from.toISOString()}:${to.toISOString()}:${typeId ?? 'all'}:${agentId ?? 'all'}:${inactivityMinutes}`;
 
-  const data = await cachedJson(cacheKey, async () =>
-    withTenantContext(user.tenantId, async () => {
+  const data = await cachedJson(cacheKey, async () => {
       const where = {
+        tenantId: user.tenantId,
         deletedAt: null,
         timestamp: { gte: from, lte: to },
         ...(typeId ? { typeEvenementId: typeId } : {}),
@@ -33,18 +33,19 @@ export async function GET(request: Request) {
       };
 
       const baseWhere = {
+        tenantId: user.tenantId,
         deletedAt: null,
         timestamp: { gte: from, lte: to },
       };
 
       const [count, byType, recent, byAgent, typeOptions, agentOptions] = await Promise.all([
-        prisma.entreeMainCourante.count({ where }),
-        prisma.entreeMainCourante.groupBy({
+        prismaAdmin.entreeMainCourante.count({ where }),
+        prismaAdmin.entreeMainCourante.groupBy({
           by: ['typeEvenementId'],
           where,
           _count: { _all: true },
         }),
-        prisma.entreeMainCourante.findMany({
+        prismaAdmin.entreeMainCourante.findMany({
           where,
           orderBy: { timestamp: 'desc' },
           take: 20,
@@ -53,18 +54,18 @@ export async function GET(request: Request) {
             user: { select: { id: true, firstName: true, lastName: true } },
           },
         }),
-        prisma.entreeMainCourante.groupBy({
+        prismaAdmin.entreeMainCourante.groupBy({
           by: ['userId'],
           where,
           _count: { _all: true },
           _max: { timestamp: true },
         }),
-        prisma.typeEvenement.findMany({
-          where: { isActive: true },
+        prismaAdmin.typeEvenement.findMany({
+          where: { tenantId: user.tenantId, isActive: true },
           select: { id: true, label: true },
           orderBy: { label: 'asc' },
         }),
-        prisma.entreeMainCourante.groupBy({
+        prismaAdmin.entreeMainCourante.groupBy({
           by: ['userId'],
           where: baseWhere,
           _count: { _all: true },
@@ -74,8 +75,8 @@ export async function GET(request: Request) {
 
       const typeIds = byType.map((item) => item.typeEvenementId);
       const types = typeIds.length
-        ? await prisma.typeEvenement.findMany({
-            where: { id: { in: typeIds } },
+        ? await prismaAdmin.typeEvenement.findMany({
+            where: { tenantId: user.tenantId, id: { in: typeIds } },
             select: { id: true, label: true },
           })
         : [];
@@ -84,14 +85,14 @@ export async function GET(request: Request) {
       const agentIds = byAgent.map((item) => item.userId);
       const agentOptionIds = agentOptions.map((item) => item.userId);
       const agents = agentIds.length
-        ? await prisma.user.findMany({
-            where: { id: { in: agentIds } },
+        ? await prismaAdmin.user.findMany({
+            where: { tenantId: user.tenantId, id: { in: agentIds } },
             select: { id: true, firstName: true, lastName: true },
           })
         : [];
       const agentsForOptions = agentOptionIds.length
-        ? await prisma.user.findMany({
-            where: { id: { in: agentOptionIds } },
+        ? await prismaAdmin.user.findMany({
+            where: { tenantId: user.tenantId, id: { in: agentOptionIds } },
             select: { id: true, firstName: true, lastName: true },
           })
         : [];
@@ -128,8 +129,7 @@ export async function GET(request: Request) {
         refreshedAt: new Date().toISOString(),
         noEntryAlert,
       };
-    }),
-  );
+  });
 
   return NextResponse.json(data);
 }

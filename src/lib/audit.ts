@@ -1,4 +1,4 @@
-import { prisma, withTenantContext } from '@/lib/prisma';
+import { prismaAdmin } from '@/lib/prisma';
 
 type AuditInput = {
   tenantId: string;
@@ -11,17 +11,15 @@ type AuditInput = {
 };
 
 export async function logAuditEvent(input: AuditInput) {
-  return withTenantContext(input.tenantId, async () =>
-    prisma.auditLog.create({
-      data: {
-        tenantId: input.tenantId,
-        userId: input.userId ?? null,
-        impersonatedBy: input.impersonatedBy ?? null,
-        action: input.action,
-        resource: input.resource,
-        ip: input.ip ?? null,
-        metadata: input.metadata,
-      },
-    }),
-  );
+  return prismaAdmin.auditLog.create({
+    data: {
+      tenantId: input.tenantId,
+      userId: input.userId ?? null,
+      impersonatedBy: input.impersonatedBy ?? null,
+      action: input.action,
+      resource: input.resource,
+      ip: input.ip ?? null,
+      metadata: input.metadata,
+    },
+  });
 }

@@ -10,7 +10,8 @@
     "ops:jobs": "node scripts/ops-jobs.mjs",
     "ops:swagger": "node scripts/swagger-server.mjs",
     "bootstrap:dev": "node scripts/bootstrap-dev.mjs",
-    "db:wipe": "prisma db execute --file ./scripts/wipe-db.sql"
+    "db:wipe": "prisma db execute --file ./scripts/wipe-db.sql",
+    "create:agent": "node scripts/create-agent.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.17.0",

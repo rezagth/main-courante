@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { jsPDF } from 'jspdf';
 import { requireAnyRole } from '@/lib/authorization';
-import { prisma, withTenantContext } from '@/lib/prisma';
+import { prismaAdmin } from '@/lib/prisma';
 
 export async function GET(request: Request) {
   const user = await requireAnyRole(['CLIENT', 'CHEF_EQUIPE', 'SUPER_ADMIN']);
@@ -9,19 +9,18 @@ export async function GET(request: Request) {
   const from = searchParams.get('from') ? new Date(searchParams.get('from') as string) : undefined;
   const to = searchParams.get('to') ? new Date(searchParams.get('to') as string) : undefined;
 
-  const [tenant, count] = await withTenantContext(user.tenantId, async () =>
-    Promise.all([
-      prisma.tenant.findFirst({ where: { id: user.tenantId }, select: { name: true } }),
-      prisma.entreeMainCourante.count({
+  const [tenant, count] = await Promise.all([
+      prismaAdmin.tenant.findFirst({ where: { id: user.tenantId }, select: { name: true } }),
+      prismaAdmin.entreeMainCourante.count({
         where: {
+          tenantId: user.tenantId,
           deletedAt: null,
           ...(from || to
             ? { timestamp: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
             : {}),
         },
       }),
-    ]),
-  );
+    ]);
 
   const doc = new jsPDF();
   doc.setFontSize(16);

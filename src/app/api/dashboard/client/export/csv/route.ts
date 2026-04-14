@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import Papa from 'papaparse';
 import { requireAnyRole } from '@/lib/authorization';
-import { prisma, withTenantContext } from '@/lib/prisma';
+import { prismaAdmin } from '@/lib/prisma';
 
 export async function GET(request: Request) {
   const user = await requireAnyRole(['CLIENT', 'CHEF_EQUIPE', 'SUPER_ADMIN']);
@@ -12,9 +12,9 @@ export async function GET(request: Request) {
     .split(',')
     .map((x) => x.trim());
 
-  const rows = await withTenantContext(user.tenantId, async () =>
-    prisma.entreeMainCourante.findMany({
+  const rows = await prismaAdmin.entreeMainCourante.findMany({
       where: {
+        tenantId: user.tenantId,
         deletedAt: null,
         ...(from || to
           ? {
@@ -31,8 +31,7 @@ export async function GET(request: Request) {
         typeEvenement: { select: { label: true } },
       },
       orderBy: { timestamp: 'desc' },
-    }),
-  );
+    });
 
   const exportRows = rows.map((row) => ({
     timestamp: row.timestamp.toISOString(),
