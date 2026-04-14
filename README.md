@@ -1,36 +1,121 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Main Courante Electronique
 
-## Getting Started
+Application SaaS multi-tenant pour la main courante d'agents de securite incendie.
 
-First, run the development server:
+## Fonctionnalites principales
+
+- Authentification Credentials (Auth.js v5) + RBAC dynamique par tenant/site/equipe
+- Dashboards par role:
+  - Agent: saisie rapide, upload photo S3, offline queue/sync
+  - Chef d'equipe: supervision equipe, stats, alertes inactivite, live polling
+  - Client: analytics read-only, heatmap, exports CSV/PDF
+  - Super Admin: multi-tenant, quotas, feature flags, operations
+- Onboarding tenant (seed types evenement, invitations magic-link, checklist)
+- API externe read-only (`/api/v1/entries`) avec API key + rate limiting
+- Ops de base: status page, logs JSON, scripts cron backup/archivage
+
+## Stack
+
+- Next.js (App Router), React, Tailwind
+- Prisma 7 + PostgreSQL
+- Redis (optionnel en dev, fallback memoire)
+- S3 (presigned URLs)
+- Dexie + Workbox (offline/PWA)
+- Recharts, TanStack Table, jsPDF, PapaParse
+
+## Prerequis
+
+- Node.js 20+
+- PostgreSQL accessible (Neon ou local)
+- (Optionnel) Redis pour sessions/rate-limit distribues
+
+## Installation
+
+```bash
+npm install
+```
+
+## Configuration environnement
+
+Copier l'exemple:
+
+```bash
+cp .env.example .env
+```
+
+Variables minimales:
+
+- `DATABASE_URL`
+- `AUTH_SECRET`
+- `NEXTAUTH_URL`
+
+Optionnelles selon usage:
+
+- `REDIS_URL`
+- `AWS_REGION`
+- `S3_BUCKET_NAME`
+- `S3_BACKUP_BUCKET`
+- `SENTRY_DSN`
+- `NEXT_PUBLIC_SENTRY_DSN`
+
+## Initialisation base de donnees
+
+```bash
+npx prisma migrate dev -n "init"
+npx prisma generate
+```
+
+## Bootstrap donnees de test
+
+```bash
+npm run bootstrap:dev
+```
+
+Comptes crees:
+
+- Super Admin: `admin@demo.local` / `Admin1234!`
+- Chef d'equipe: `chef@demo.local` / `Chef1234!`
+- Agent: `agent@demo.local` / `Agent1234!`
+- Client: `client@demo.local` / `Client1234!`
+
+## Lancer l'application
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Login: `http://localhost:3000/login`
+- Status: `http://localhost:3000/status`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts utiles
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run bootstrap:dev` - seed complet tenant/roles/comptes
+- `npm run db:wipe` - purge complete de la base
+- `npm run ops:jobs` - jobs ops (archivage/backup)
+- `npm run ops:swagger` - Swagger UI pour API externe
 
-## Learn More
+## Routes role-based
 
-To learn more about Next.js, take a look at the following resources:
+- Agent: `/agent/dashboard`
+- Chef: `/chef/dashboard`
+- Client: `/client/dashboard`
+- Admin: `/admin/dashboard`
+- Admin Ops: `/admin/operations`
+- Admin Onboarding: `/admin/onboarding`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## API externe
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Endpoint: `GET /api/v1/entries`
+- Auth: header `x-api-key`
+- Filtres: `site_id`, `date_from`, `date_to`, `type`, `page`, `take`
+- OpenAPI: `GET /api/v1/openapi`
 
-## Deploy on Vercel
+## Documentation ops
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Voir `docs/OPERATIONS.md` pour:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- onboarding tenant
+- quotas SaaS
+- retention/archivage
+- backup/restore
+- monitoring/alerting
