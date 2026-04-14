@@ -1,0 +1,487 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum Gravite {
+  INFO
+  FAIBLE
+  MOYENNE
+  ELEVEE
+  CRITIQUE
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  plan      String   @default("STANDARD")
+  status    String   @default("ACTIVE")
+  logoUrl   String?  @map("logo_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  lastActivityAt DateTime? @map("last_activity_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sites           Site[]
+  teams           Team[]
+  users           User[]
+  eventTypes      TypeEvenement[]
+  entries         EntreeMainCourante[]
+  roles           Role[]
+  permissions     Permission[]
+  rolePermissions RolePermission[]
+  roleAssignments UserRoleAssignment[]
+  teamMembers     TeamMember[]
+  auditLogs       AuditLog[]
+  ssoProviders    TenantSsoProvider[]
+  featureFlags    TenantFeatureFlag[]
+  quotas          TenantQuota?
+  retentionPolicy TenantRetentionPolicy?
+  invitations     TenantInvitation[]
+  onboarding      TenantOnboardingChecklist?
+  apiKeys         TenantApiKey[]
+  backups         BackupRun[]
+  archivedEntries ArchivedEntry[]
+  impersonationSessions ImpersonationSession[]
+
+  @@map("tenants")
+}
+
+model TenantQuota {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @unique @map("tenant_id") @db.Uuid
+  maxActiveUsers   Int      @default(25) @map("max_active_users")
+  maxEntriesPerMonth Int    @default(10000) @map("max_entries_per_month")
+  maxStorageGb     Int      @default(20) @map("max_storage_gb")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_quotas")
+}
+
+model TenantRetentionPolicy {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @unique @map("tenant_id") @db.Uuid
+  activeYears    Int      @default(1) @map("active_years")
+  archiveYears   Int      @default(5) @map("archive_years")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_retention_policies")
+}
+
+model TenantInvitation {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  email       String
+  tokenHash   String   @map("token_hash")
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  acceptedAt  DateTime? @map("accepted_at") @db.Timestamptz(6)
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, email])
+  @@index([tenantId, expiresAt])
+  @@map("tenant_invitations")
+}
+
+model TenantOnboardingChecklist {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @unique @map("tenant_id") @db.Uuid
+  siteCreated      Boolean  @default(false) @map("site_created")
+  teamCreated      Boolean  @default(false) @map("team_created")
+  agentInvited     Boolean  @default(false) @map("agent_invited")
+  completedAt      DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_onboarding_checklists")
+}
+
+model TenantApiKey {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  label       String
+  keyHash     String   @map("key_hash")
+  isActive    Boolean  @default(true) @map("is_active")
+  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+  @@map("tenant_api_keys")
+}
+
+model ArchivedEntry {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  originalEntryId String @map("original_entry_id") @db.Uuid
+  payload       Json
+  archivedAt    DateTime @default(now()) @map("archived_at") @db.Timestamptz(6)
+  purgedAt      DateTime? @map("purged_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, originalEntryId])
+  @@index([tenantId, archivedAt])
+  @@map("archived_entries")
+}
+
+model BackupRun {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String?  @map("tenant_id") @db.Uuid
+  kind        String
+  status      String
+  storageKey  String?  @map("storage_key")
+  startedAt   DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt  DateTime? @map("finished_at") @db.Timestamptz(6)
+  metadata    Json?
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([kind, status, startedAt])
+  @@map("backup_runs")
+}
+
+model TenantFeatureFlag {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  key       String
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId, enabled])
+  @@map("tenant_feature_flags")
+}
+
+model Site {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  address   String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  teams       Team[]
+  users       User[]
+  entries     EntreeMainCourante[]
+  assignments UserRoleAssignment[]
+
+  @@unique([tenantId, code])
+  @@unique([id, tenantId])
+  @@index([tenantId, name])
+  @@map("sites")
+}
+
+model Team {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  siteId    String   @map("site_id") @db.Uuid
+  code      String
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  site        Site     @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  members     TeamMember[]
+  entries     EntreeMainCourante[]
+  assignments UserRoleAssignment[]
+
+  @@unique([tenantId, siteId, code])
+  @@unique([id, tenantId])
+  @@index([tenantId, siteId, name])
+  @@map("teams")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  siteId       String?    @map("site_id") @db.Uuid
+  email        String
+  firstName    String     @map("first_name")
+  lastName     String     @map("last_name")
+  passwordHash String?    @map("password_hash")
+  status       UserStatus @default(ACTIVE)
+  isActive     Boolean    @default(true) @map("is_active")
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  site           Site?       @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  teamMembership TeamMember[]
+  entries        EntreeMainCourante[]
+  assignments    UserRoleAssignment[]
+  auditLogs      AuditLog[]            @relation("AuditActor")
+  impersonations ImpersonationSession[] @relation("ImpersonationActor")
+  impersonatedIn ImpersonationSession[] @relation("ImpersonationTarget")
+  auditImpersonations AuditLog[]        @relation("AuditImpersonationActor")
+  totpFactors    UserTotpFactor[]
+
+  @@unique([tenantId, email])
+  @@unique([id, tenantId])
+  @@index([tenantId, siteId])
+  @@index([tenantId, lastName, firstName])
+  @@map("users")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  impersonatedBy String?  @map("impersonated_by") @db.Uuid
+  action         String
+  resource       String
+  ip             String?
+  metadata       Json?
+  timestamp      DateTime @default(now()) @db.Timestamptz(6)
+
+  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                 User?                @relation("AuditActor", fields: [userId, tenantId], references: [id, tenantId], onDelete: SetNull)
+  impersonatedByUser   User?                @relation("AuditImpersonationActor", fields: [impersonatedBy, tenantId], references: [id, tenantId], onDelete: SetNull)
+  impersonationSession ImpersonationSession?
+
+  @@index([tenantId, timestamp(sort: Desc)], map: "idx_audit_tenant_ts")
+  @@index([tenantId, action, timestamp(sort: Desc)], map: "idx_audit_tenant_action_ts")
+  @@index([tenantId, userId, timestamp(sort: Desc)], map: "idx_audit_tenant_user_ts")
+  @@map("audit_logs")
+}
+
+model ImpersonationSession {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  actorUserId       String    @map("actor_user_id") @db.Uuid
+  targetUserId      String    @map("target_user_id") @db.Uuid
+  tokenHash         String    @map("token_hash")
+  startedAt         DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt           DateTime? @map("ended_at") @db.Timestamptz(6)
+  endedReason       String?   @map("ended_reason")
+  lastActionAt      DateTime? @map("last_action_at") @db.Timestamptz(6)
+  lastAuditLogId    String?   @unique @map("last_audit_log_id") @db.Uuid
+
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  actorUser         User      @relation("ImpersonationActor", fields: [actorUserId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  targetUser        User      @relation("ImpersonationTarget", fields: [targetUserId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  lastAuditLog      AuditLog? @relation(fields: [lastAuditLogId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, actorUserId, startedAt(sort: Desc)])
+  @@index([tenantId, targetUserId, startedAt(sort: Desc)])
+  @@map("impersonation_sessions")
+}
+
+model UserTotpFactor {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  label        String?
+  secretCipher String    @map("secret_cipher")
+  isVerified   Boolean   @default(false) @map("is_verified")
+  enabledAt    DateTime? @map("enabled_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@index([tenantId, userId, isVerified])
+  @@map("user_totp_factors")
+}
+
+model TenantSsoProvider {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  providerType String   @default("SAML") @map("provider_type")
+  entityId     String   @map("entity_id")
+  ssoUrl       String   @map("sso_url")
+  x509CertPem  String   @map("x509_cert_pem")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, entityId])
+  @@index([tenantId, isActive])
+  @@map("tenant_sso_providers")
+}
+
+model TeamMember {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  teamId    String    @map("team_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  startedAt DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  team   Team   @relation(fields: [teamId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  user   User   @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([tenantId, teamId, userId, startedAt])
+  @@index([tenantId, userId, endedAt])
+  @@map("team_members")
+}
+
+model TypeEvenement {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  code           String
+  label          String
+  defaultGravite Gravite?  @map("default_gravite")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant  Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  entries EntreeMainCourante[]
+
+  @@unique([tenantId, code])
+  @@unique([id, tenantId])
+  @@index([tenantId, isActive])
+  @@map("types_evenement")
+}
+
+model EntreeMainCourante {
+  id              String     @id @default(uuid()) @db.Uuid
+  tenantId        String     @map("tenant_id") @db.Uuid
+  siteId          String     @map("site_id") @db.Uuid
+  teamId          String     @map("team_id") @db.Uuid
+  userId          String     @map("user_id") @db.Uuid
+  typeEvenementId String     @map("type_evenement_id") @db.Uuid
+  timestamp       DateTime   @db.Timestamptz(6)
+  description     String
+  localisation    String?
+  photoUrl        String?    @map("photo_url")
+  gravite         Gravite?
+  syncStatus      SyncStatus @default(PENDING) @map("sync_status")
+  deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(6)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  searchVector Unsupported("tsvector")? @map("search_vector")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  site          Site          @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  team          Team          @relation(fields: [teamId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  user          User          @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  typeEvenement TypeEvenement @relation(fields: [typeEvenementId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, siteId, timestamp(sort: Desc)], map: "idx_entries_tenant_site_ts")
+  @@index([tenantId, teamId, timestamp(sort: Desc)], map: "idx_entries_tenant_team_ts")
+  @@index([tenantId, userId, timestamp(sort: Desc)], map: "idx_entries_tenant_user_ts")
+  @@index([tenantId, typeEvenementId, timestamp(sort: Desc)], map: "idx_entries_tenant_type_ts")
+  @@index([tenantId, syncStatus], map: "idx_entries_tenant_sync")
+  @@index([tenantId, deletedAt], map: "idx_entries_tenant_deleted")
+  @@index([searchVector], type: Gin, map: "idx_entries_search_gin")
+  @@map("entrees_main_courante")
+}
+
+model Role {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  label     String
+  isSystem  Boolean  @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  rolePermissions RolePermission[]
+  assignments     UserRoleAssignment[]
+
+  @@unique([tenantId, code])
+  @@unique([id, tenantId])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  resource    String
+  action      String
+  code        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, resource, action])
+  @@unique([id, tenantId])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  allowed      Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  role       Role       @relation(fields: [roleId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, roleId, permissionId])
+  @@index([tenantId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRoleAssignment {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  roleId    String    @map("role_id") @db.Uuid
+  siteId    String?   @map("site_id") @db.Uuid
+  teamId    String?   @map("team_id") @db.Uuid
+  validFrom DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
+  validTo   DateTime? @map("valid_to") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  site   Site?  @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  team   Team?  @relation(fields: [teamId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@index([tenantId, userId, validTo])
+  @@index([tenantId, siteId, teamId])
+  @@unique([tenantId, userId, roleId, siteId, teamId, validFrom])
+  @@map("user_role_assignments")
+}

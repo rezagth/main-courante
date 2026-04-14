@@ -1,0 +1,143 @@
+import { NextResponse } from 'next/server';
+import { requireAnyRole } from '@/lib/authorization';
+import { cachedJson } from '@/lib/cache';
+import { prisma, withTenantContext } from '@/lib/prisma';
+
+function buildWhere(searchParams: URLSearchParams) {
+  const now = new Date();
+  const days = Number(searchParams.get('days') ?? '30');
+  const from = searchParams.get('from')
+    ? new Date(searchParams.get('from') as string)
+    : new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const to = searchParams.get('to') ? new Date(searchParams.get('to') as string) : now;
+  const typeId = searchParams.get('typeId') || undefined;
+  const agentId = searchParams.get('agentId') || undefined;
+  const siteId = searchParams.get('siteId') || undefined;
+  const gravite = searchParams.get('gravite') || undefined;
+  const query = searchParams.get('q') || undefined;
+  const take = Math.min(Number(searchParams.get('take') ?? '20'), 100);
+  const page = Math.max(Number(searchParams.get('page') ?? '0'), 0);
+
+  return {
+    from,
+    to,
+    take,
+    page,
+    where: {
+      deletedAt: null,
+      timestamp: { gte: from, lte: to },
+      ...(typeId ? { typeEvenementId: typeId } : {}),
+      ...(agentId ? { userId: agentId } : {}),
+      ...(siteId ? { siteId } : {}),
+      ...(gravite ? { gravite } : {}),
+      ...(query
+        ? {
+            OR: [
+              { description: { contains: query, mode: 'insensitive' as const } },
+              { localisation: { contains: query, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    },
+  };
+}
+
+export async function GET(request: Request) {
+  const user = await requireAnyRole(['CLIENT', 'CHEF_EQUIPE', 'SUPER_ADMIN']);
+  const { searchParams } = new URL(request.url);
+  const params = buildWhere(searchParams);
+  const key = `analytics:client:${user.tenantId}:${JSON.stringify(params)}`;
+
+  const payload = await cachedJson(key, async () =>
+    withTenantContext(user.tenantId, async () => {
+      const [rows, total, bySite, byType, byAgent, trend] = await Promise.all([
+        prisma.entreeMainCourante.findMany({
+          where: params.where,
+          include: {
+            site: { select: { name: true } },
+            user: { select: { firstName: true, lastName: true } },
+            typeEvenement: { select: { label: true } },
+          },
+          orderBy: { timestamp: 'desc' },
+          skip: params.page * params.take,
+          take: params.take,
+        }),
+        prisma.entreeMainCourante.count({ where: params.where }),
+        prisma.entreeMainCourante.groupBy({
+          by: ['siteId'],
+          where: params.where,
+          _count: { _all: true },
+        }),
+        prisma.entreeMainCourante.groupBy({
+          by: ['typeEvenementId'],
+          where: params.where,
+          _count: { _all: true },
+        }),
+        prisma.entreeMainCourante.groupBy({
+          by: ['userId'],
+          where: params.where,
+          _count: { _all: true },
+        }),
+        prisma.entreeMainCourante.findMany({
+          where: params.where,
+          select: { timestamp: true },
+          orderBy: { timestamp: 'asc' },
+        }),
+      ]);
+
+      const sites = await prisma.site.findMany({
+        where: { id: { in: bySite.map((x) => x.siteId) } },
+        select: { id: true, name: true },
+      });
+      const siteMap = Object.fromEntries(sites.map((s) => [s.id, s.name]));
+
+      const types = await prisma.typeEvenement.findMany({
+        where: { id: { in: byType.map((x) => x.typeEvenementId) } },
+        select: { id: true, label: true },
+      });
+      const typeMap = Object.fromEntries(types.map((t) => [t.id, t.label]));
+
+      const users = await prisma.user.findMany({
+        where: { id: { in: byAgent.map((x) => x.userId) } },
+        select: { id: true, firstName: true, lastName: true },
+      });
+      const userMap = Object.fromEntries(
+        users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]),
+      );
+
+      const heatmap = Array.from({ length: 7 }).flatMap((_, day) =>
+        Array.from({ length: 24 }).map((__, hour) => ({
+          day,
+          hour,
+          count: 0,
+        })),
+      );
+      trend.forEach((item) => {
+        const dt = new Date(item.timestamp);
+        const slot = heatmap.find((h) => h.day === dt.getUTCDay() && h.hour === dt.getUTCHours());
+        if (slot) slot.count += 1;
+      });
+
+      return {
+        rows,
+        total,
+        nextPage: (params.page + 1) * params.take < total ? params.page + 1 : null,
+        bySite: bySite.map((x) => ({ siteId: x.siteId, label: siteMap[x.siteId] ?? 'Site', count: x._count._all })),
+        byType: byType.map((x) => ({
+          typeId: x.typeEvenementId,
+          label: typeMap[x.typeEvenementId] ?? 'Type',
+          count: x._count._all,
+        })),
+        byAgent: byAgent.map((x) => ({
+          userId: x.userId,
+          label: userMap[x.userId] ?? 'Agent',
+          count: x._count._all,
+        })),
+        trend: trend.map((x) => ({ timestamp: x.timestamp })),
+        heatmap,
+      };
+    }),
+  );
+
+  return NextResponse.json(payload);
+}
