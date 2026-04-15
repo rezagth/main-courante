@@ -4,7 +4,7 @@ import { requireAnyRole } from '@/lib/authorization';
 import { prismaAdmin } from '@/lib/prisma';
 
 export async function GET(request: Request) {
-  const user = await requireAnyRole(['CLIENT', 'CHEF_EQUIPE', 'SUPER_ADMIN']);
+  const user = await requireAnyRole(['CLIENT', 'CHEF_EQUIPE', 'PATRON', 'SUPER_ADMIN']);
   const { searchParams } = new URL(request.url);
   const from = searchParams.get('from') ? new Date(searchParams.get('from') as string) : undefined;
   const to = searchParams.get('to') ? new Date(searchParams.get('to') as string) : undefined;

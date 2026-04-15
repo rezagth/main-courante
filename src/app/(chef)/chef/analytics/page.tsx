@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 export default async function ChefAnalyticsOverviewPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
-  if (!hasAnyRole(session.user.roles, ['CHEF_EQUIPE', 'SUPER_ADMIN'])) redirect(resolveDefaultDashboardPath(session.user.roles));
+  if (!hasAnyRole(session.user.roles, ['CHEF_EQUIPE', 'PATRON', 'SUPER_ADMIN'])) redirect(resolveDefaultDashboardPath(session.user.roles));
 
   return <ChefAnalyticsOverview />;
 }

@@ -15,7 +15,7 @@ function dateRange(searchParams: URLSearchParams) {
 }
 
 export async function GET(request: Request) {
-  const user = await requireAnyRole(['CHEF_EQUIPE', 'SUPER_ADMIN']);
+  const user = await requireAnyRole(['CHEF_EQUIPE', 'PATRON', 'SUPER_ADMIN']);
   const { searchParams } = new URL(request.url);
   const { from, to } = dateRange(searchParams);
   const typeId = searchParams.get('typeId') || undefined;

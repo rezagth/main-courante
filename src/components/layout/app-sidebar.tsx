@@ -25,6 +25,8 @@ type SidebarProps = {
 export function AppSidebar({ userName, userEmail, roles, children }: SidebarProps) {
   const sectionTitle = roles.includes('SUPER_ADMIN')
     ? 'Administration'
+    : roles.includes('PATRON')
+      ? 'Patron'
     : roles.includes('AGENT')
       ? 'Agent'
       : roles.includes('CHEF_EQUIPE')

@@ -5,6 +5,7 @@ import { prismaAdmin } from '@/lib/prisma';
 import { createInvitationLink } from '@/lib/magic-link';
 import { sendMail } from '@/lib/mail';
 import { logger } from '@/lib/logger';
+import { requireAnyRole } from '@/lib/authorization';
 
 const schema = z.object({
   name: z.string().min(2),
@@ -23,6 +24,8 @@ const DEFAULT_EVENT_TYPES = [
 ];
 
 export async function POST(request: Request) {
+  await requireAnyRole(['SUPER_ADMIN', 'PATRON']);
+
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

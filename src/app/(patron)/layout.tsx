@@ -4,14 +4,14 @@ import { AppSidebar } from '@/components/layout/app-sidebar';
 import { auth } from '@/lib/auth';
 import { hasAnyRole } from '@/lib/role-routing';
 
-export default async function ClientLayout({ children }: { children: ReactNode }) {
+export default async function PatronLayout({ children }: { children: ReactNode }) {
   const session = await auth();
 
   if (!session?.user) {
     redirect('/login');
   }
 
-  if (!hasAnyRole(session.user.roles, ['CLIENT', 'PATRON', 'SUPER_ADMIN'])) {
+  if (!hasAnyRole(session.user.roles, ['PATRON', 'SUPER_ADMIN'])) {
     redirect('/');
   }
 
@@ -21,4 +21,3 @@ export default async function ClientLayout({ children }: { children: ReactNode }
     </AppSidebar>
   );
 }
-

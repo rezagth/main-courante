@@ -2,6 +2,7 @@ export const ROLES = {
   AGENT: 'AGENT',
   CHEF_EQUIPE: 'CHEF_EQUIPE',
   CLIENT: 'CLIENT',
+  PATRON: 'PATRON',
   SUPER_ADMIN: 'SUPER_ADMIN',
 } as const;
 
@@ -14,7 +15,11 @@ export type PermissionCode =
   | 'ENTRY:DELETE'
   | 'ENTRY:EXPORT'
   | 'TYPE_EVENT:MANAGE'
-  | 'USER:READ';
+  | 'USER:READ'
+  | 'USER:MANAGE'
+  | 'TENANT:CREATE'
+  | 'SITE:MANAGE'
+  | 'ROLE:MANAGE';
 
 export type RoleAssignmentScope = {
   tenantId: string;
@@ -48,6 +53,19 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     'USER:READ',
   ],
   CLIENT: ['ENTRY:READ'],
+  PATRON: [
+    'ENTRY:CREATE',
+    'ENTRY:READ',
+    'ENTRY:UPDATE',
+    'ENTRY:DELETE',
+    'ENTRY:EXPORT',
+    'TYPE_EVENT:MANAGE',
+    'USER:READ',
+    'USER:MANAGE',
+    'TENANT:CREATE',
+    'SITE:MANAGE',
+    'ROLE:MANAGE',
+  ],
   SUPER_ADMIN: [
     'ENTRY:CREATE',
     'ENTRY:READ',
@@ -56,6 +74,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     'ENTRY:EXPORT',
     'TYPE_EVENT:MANAGE',
     'USER:READ',
+    'USER:MANAGE',
+    'TENANT:CREATE',
+    'SITE:MANAGE',
+    'ROLE:MANAGE',
   ],
 };
 

@@ -24,6 +24,7 @@ const adminPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD ?? 'Admin1234!';
 
 const roleDefs = [
   { code: 'SUPER_ADMIN', label: 'Super Admin' },
+  { code: 'PATRON', label: 'Patron' },
   { code: 'CHEF_EQUIPE', label: "Chef d'equipe" },
   { code: 'AGENT', label: 'Agent' },
   { code: 'CLIENT', label: 'Client' },
@@ -37,6 +38,10 @@ const permissionDefs = [
   { resource: 'ENTRY', action: 'EXPORT', code: 'ENTRY:EXPORT' },
   { resource: 'TYPE_EVENT', action: 'MANAGE', code: 'TYPE_EVENT:MANAGE' },
   { resource: 'USER', action: 'READ', code: 'USER:READ' },
+  { resource: 'USER', action: 'MANAGE', code: 'USER:MANAGE' },
+  { resource: 'TENANT', action: 'CREATE', code: 'TENANT:CREATE' },
+  { resource: 'SITE', action: 'MANAGE', code: 'SITE:MANAGE' },
+  { resource: 'ROLE', action: 'MANAGE', code: 'ROLE:MANAGE' },
 ];
 
 const defaultTypes = [
@@ -124,10 +129,24 @@ async function run() {
       update: {},
     });
 
-    for (const roleCode of ['SUPER_ADMIN', 'CHEF_EQUIPE', 'AGENT', 'CLIENT']) {
+    for (const roleCode of ['SUPER_ADMIN', 'PATRON', 'CHEF_EQUIPE', 'AGENT', 'CLIENT']) {
       const role = roles[roleCode];
       const shouldAllow =
         roleCode === 'SUPER_ADMIN' ||
+        (roleCode === 'PATRON' &&
+          [
+            'ENTRY:CREATE',
+            'ENTRY:READ',
+            'ENTRY:UPDATE',
+            'ENTRY:DELETE',
+            'ENTRY:EXPORT',
+            'TYPE_EVENT:MANAGE',
+            'USER:READ',
+            'USER:MANAGE',
+            'TENANT:CREATE',
+            'SITE:MANAGE',
+            'ROLE:MANAGE',
+          ].includes(item.code)) ||
         (roleCode === 'CHEF_EQUIPE' &&
           ['ENTRY:CREATE', 'ENTRY:READ', 'ENTRY:UPDATE', 'ENTRY:EXPORT', 'TYPE_EVENT:MANAGE', 'USER:READ'].includes(item.code)) ||
         (roleCode === 'AGENT' && ['ENTRY:CREATE', 'ENTRY:READ', 'ENTRY:UPDATE'].includes(item.code)) ||
@@ -233,6 +252,13 @@ async function run() {
   }
 
   const roleUsers = [
+    {
+      email: 'patron@demo.local',
+      firstName: 'Sarah',
+      lastName: 'Patron',
+      roleCode: 'PATRON',
+      password: 'Patron1234!',
+    },
     {
       email: 'chef@demo.local',
       firstName: 'Nora',
@@ -354,6 +380,7 @@ async function run() {
   console.log(`Login: ${adminEmail}`);
   console.log(`Mot de passe: ${adminPassword}`);
   console.log('--- Comptes de test supplementaires ---');
+  console.log('Patron: patron@demo.local / Patron1234! -> /patron/dashboard');
   console.log('Chef:   chef@demo.local / Chef1234!   -> /chef/dashboard');
   console.log('Agent:  agent@demo.local / Agent1234! -> /agent/dashboard');
   console.log('Client: client@demo.local / Client1234! -> /client/dashboard');

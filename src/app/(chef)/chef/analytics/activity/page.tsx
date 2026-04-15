@@ -9,7 +9,7 @@ type ChefPayload = { recent: Array<{ id: string; timestamp: string; description:
 export default async function ChefAnalyticsActivityPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
-  if (!hasAnyRole(session.user.roles, ['CHEF_EQUIPE', 'SUPER_ADMIN'])) redirect(resolveDefaultDashboardPath(session.user.roles));
+  if (!hasAnyRole(session.user.roles, ['CHEF_EQUIPE', 'PATRON', 'SUPER_ADMIN'])) redirect(resolveDefaultDashboardPath(session.user.roles));
 
   const data = await fetchServerJson<ChefPayload>('/api/dashboard/chef?inactivityMinutes=30');
 

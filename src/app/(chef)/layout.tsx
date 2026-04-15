@@ -11,7 +11,7 @@ export default async function ChefLayout({ children }: { children: ReactNode }) 
     redirect('/login');
   }
 
-  if (!hasAnyRole(session.user.roles, ['CHEF_EQUIPE', 'SUPER_ADMIN'])) {
+  if (!hasAnyRole(session.user.roles, ['CHEF_EQUIPE', 'PATRON', 'SUPER_ADMIN'])) {
     redirect('/');
   }
 

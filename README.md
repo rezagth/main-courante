@@ -74,6 +74,7 @@ npm run bootstrap:dev
 Comptes crees:
 
 - Super Admin: `admin@demo.local` / `Admin1234!`
+- Patron: `patron@demo.local` / `Patron1234!`
 - Chef d'equipe: `chef@demo.local` / `Chef1234!`
 - Agent: `agent@demo.local` / `Agent1234!`
 - Client: `client@demo.local` / `Client1234!`
@@ -99,6 +100,7 @@ npm run dev
 - Agent: `/agent/dashboard`
 - Chef: `/chef/dashboard`
 - Client: `/client/dashboard`
+- Patron: `/patron/dashboard`
 - Admin: `/admin/dashboard`
 - Admin Ops: `/admin/operations`
 - Admin Onboarding: `/admin/onboarding`

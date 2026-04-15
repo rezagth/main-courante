@@ -9,7 +9,7 @@ type ClientPayload = { bySite: Array<{ label: string; count: number }>; total: n
 export default async function ClientAnalyticsSitesPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
-  if (!hasAnyRole(session.user.roles, ['CLIENT', 'SUPER_ADMIN'])) redirect(resolveDefaultDashboardPath(session.user.roles));
+  if (!hasAnyRole(session.user.roles, ['CLIENT', 'PATRON', 'SUPER_ADMIN'])) redirect(resolveDefaultDashboardPath(session.user.roles));
 
   const data = await fetchServerJson<ClientPayload>('/api/dashboard/client?days=30&page=0&take=5');
 

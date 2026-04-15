@@ -21,10 +21,10 @@ import {
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   userName?: string | null
   userEmail?: string | null
-  roles: string[]
+  roles?: string[]
 }
 
-const ALL_APP_ROLES = ["SUPER_ADMIN", "AGENT", "CHEF_EQUIPE", "CLIENT"]
+const ALL_APP_ROLES = ["SUPER_ADMIN", "PATRON", "AGENT", "CHEF_EQUIPE", "CLIENT"]
 
 function hasAccess(userRoles: string[], allowedRoles: string[]): boolean {
   return userRoles.some((role) => allowedRoles.includes(role))
@@ -43,6 +43,7 @@ function initials(name?: string | null): string {
 function roleLabel(role: string): string {
   const labels: Record<string, string> = {
     SUPER_ADMIN: "Super admin",
+    PATRON: "Patron",
     AGENT: "Agent",
     CHEF_EQUIPE: "Chef d’équipe",
     CLIENT: "Client",
@@ -88,6 +89,26 @@ const NAV_MAIN = [
     ],
   },
   {
+    title: "Patron",
+    url: "/patron",
+    icon: <ShieldCheckIcon />,
+    allowedRoles: ["PATRON", "SUPER_ADMIN"],
+    items: [
+      {
+        title: "Dashboard patron",
+        url: "/patron/dashboard",
+      },
+      {
+        title: "Personnel",
+        url: "/patron/personnel",
+      },
+      {
+        title: "Créer un tenant",
+        url: "/patron/onboarding",
+      },
+    ],
+  },
+  {
     title: "Agent",
     url: "/agent",
     icon: <LayoutDashboardIcon />,
@@ -107,7 +128,7 @@ const NAV_MAIN = [
     title: "Chef d’équipe",
     url: "/chef",
     icon: <UsersIcon />,
-    allowedRoles: ["CHEF_EQUIPE", "SUPER_ADMIN"],
+    allowedRoles: ["CHEF_EQUIPE", "PATRON", "SUPER_ADMIN"],
     items: [
       {
         title: "Dashboard chef",
@@ -131,7 +152,7 @@ const NAV_MAIN = [
     title: "Client",
     url: "/client",
     icon: <Building2Icon />,
-    allowedRoles: ["CLIENT", "SUPER_ADMIN"],
+    allowedRoles: ["CLIENT", "PATRON", "SUPER_ADMIN"],
     items: [
       {
         title: "Dashboard client",
@@ -181,17 +202,19 @@ const NAV_SECONDARY = [
 ]
 
 export function AppSidebar({ userName, userEmail, roles, ...props }: AppSidebarProps) {
-  const isSuperAdmin = roles.includes('SUPER_ADMIN')
+  const safeRoles = roles ?? []
+  const isSuperAdmin = safeRoles.includes('SUPER_ADMIN')
 
   const normalizeUrl = (url: string) => {
     if (!isSuperAdmin) return url
+    if (url === '/patron/dashboard') return '/patron'
     if (url === '/agent/dashboard') return '/agent'
     if (url === '/chef/dashboard') return '/chef'
     if (url === '/client/dashboard') return '/client'
     return url
   }
 
-  const navMain = NAV_MAIN.filter((item) => hasAccess(roles, [...item.allowedRoles])).map((item) => ({
+  const navMain = NAV_MAIN.filter((item) => hasAccess(safeRoles, [...item.allowedRoles])).map((item) => ({
     title: item.title,
     url: normalizeUrl(item.url),
     icon: item.icon,
@@ -202,13 +225,13 @@ export function AppSidebar({ userName, userEmail, roles, ...props }: AppSidebarP
     })),
   }))
 
-  const navSecondary = NAV_SECONDARY.filter((item) => hasAccess(roles, [...item.allowedRoles])).map((item) => ({
+  const navSecondary = NAV_SECONDARY.filter((item) => hasAccess(safeRoles, [...item.allowedRoles])).map((item) => ({
     title: item.title,
     url: item.url,
     icon: item.icon,
   }))
 
-  const visibleRoleLabels = roles.filter((role) => ALL_APP_ROLES.includes(role)).map(roleLabel)
+  const visibleRoleLabels = safeRoles.filter((role) => ALL_APP_ROLES.includes(role)).map(roleLabel)
 
   return (
     <Sidebar

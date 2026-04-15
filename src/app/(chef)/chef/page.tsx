@@ -6,6 +6,6 @@ import { redirect } from 'next/navigation';
 export default async function ChefHomePage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
-  if (!hasAnyRole(session.user.roles, ['CHEF_EQUIPE', 'SUPER_ADMIN'])) redirect('/');
+  if (!hasAnyRole(session.user.roles, ['CHEF_EQUIPE', 'PATRON', 'SUPER_ADMIN'])) redirect('/');
   return <ChefDashboard />;
 }

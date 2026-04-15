@@ -43,7 +43,7 @@ function buildWhere(searchParams: URLSearchParams) {
 }
 
 export async function GET(request: Request) {
-  const user = await requireAnyRole(['CLIENT', 'CHEF_EQUIPE', 'SUPER_ADMIN']);
+  const user = await requireAnyRole(['CLIENT', 'CHEF_EQUIPE', 'PATRON', 'SUPER_ADMIN']);
   const { searchParams } = new URL(request.url);
   const params = buildWhere(searchParams);
   const key = `analytics:client:${user.tenantId}:${JSON.stringify(params)}`;

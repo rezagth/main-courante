@@ -7,8 +7,9 @@ const PUBLIC_API_PREFIXES = ['/api/auth', '/api/status', '/api/v1/openapi'];
 const PUBLIC_PATHS = ['/login', '/status'];
 const ROLE_PROTECTED_PATHS: Array<{ prefix: string; roles: string[] }> = [
   { prefix: '/agent', roles: ['AGENT', 'SUPER_ADMIN'] },
-  { prefix: '/chef', roles: ['CHEF_EQUIPE', 'SUPER_ADMIN'] },
-  { prefix: '/client', roles: ['CLIENT', 'SUPER_ADMIN'] },
+  { prefix: '/chef', roles: ['CHEF_EQUIPE', 'PATRON', 'SUPER_ADMIN'] },
+  { prefix: '/client', roles: ['CLIENT', 'PATRON', 'SUPER_ADMIN'] },
+  { prefix: '/patron', roles: ['PATRON', 'SUPER_ADMIN'] },
   { prefix: '/admin', roles: ['SUPER_ADMIN'] },
 ];
 
