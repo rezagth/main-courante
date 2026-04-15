@@ -1,21 +1,161 @@
+/*
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasNext, setHasNext] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+    setIsRefreshing(true);
+    const response = await fetch(`/api/entries?take=20&page=${nextPage}`);
+    if (!response.ok) {
+      setIsRefreshing(false);
+      return;
+    }
+    const payload = (await response.json()) as { data: Entry[]; nextPage: number | null };
+    setEntries((previous) => (replace ? payload.data : [...previous, ...payload.data]));
+    setHasNext(payload.nextPage !== null);
+    setPage(payload.nextPage ?? nextPage);
+    setIsRefreshing(false);
+  }, []);
 import { Textarea } from '@/components/ui/textarea';
 import { UndoToast } from '@/components/ui/toast';
-import { loadDraft, useDraftAutosave } from '@/hooks/use-draft-autosave';
+    fetchEntries(0, true);
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { useServiceWorker } from '@/hooks/use-service-worker';
 import { useSyncQueue } from '@/hooks/use-sync-queue';
-import { sha256 } from '@/lib/utils';
+    <main className="mx-auto w-full max-w-6xl space-y-4 p-4">
+      <section className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.2),transparent_45%),#111111] p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Espace agent</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-100">Dashboard opérationnel</h1>
+            <p className="mt-1 text-sm text-zinc-400">Suivi des entrées du jour, statut réseau et file hors ligne.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={isOnline ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300' : 'border-red-400/20 bg-red-500/10 text-red-300'}>
+              {isOnline ? 'En ligne' : 'Hors ligne'}
+            </Badge>
+            <Badge className="border-white/10 bg-white/5 text-zinc-300">{pendingCount} en attente</Badge>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"
+              onClick={() => fetchEntries(0, true)}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? 'Actualisation...' : 'Actualiser'}
+            </Button>
+            <Button asChild className="bg-orange-500 text-white hover:bg-orange-400">
+              <Link href="/agent/entries/new">Créer une entrée</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
 
-type EventType = { id: string; code: string; label: string };
+      {!isOnline ? (
+        <Card className="border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">
+          Mode hors ligne actif — vos prochaines entrées seront synchronisées automatiquement dès le retour du réseau.
+        </Card>
+      ) : null}
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="border-white/10 bg-[#111111] p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Entrées chargées</p>
+          <p className="mt-2 text-3xl font-semibold text-orange-300">{stats.total}</p>
+          <p className="mt-1 text-xs text-zinc-500">Page en cours</p>
+        </Card>
+        <Card className="border-white/10 bg-[#111111] p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Critiques</p>
+          <p className="mt-2 text-3xl font-semibold text-red-300">{stats.critical}</p>
+          <p className="mt-1 text-xs text-zinc-500">Gravité élevée</p>
+        </Card>
+        <Card className="border-white/10 bg-[#111111] p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Moyennes</p>
+          <p className="mt-2 text-3xl font-semibold text-amber-300">{stats.medium}</p>
+          <p className="mt-1 text-xs text-zinc-500">À surveiller</p>
+        </Card>
+        <Card className="border-white/10 bg-[#111111] p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Dernière activité</p>
+          <p className="mt-2 text-lg font-semibold text-zinc-100">
+            {stats.last ? new Date(stats.last).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">Horodatage local</p>
+        </Card>
+      </section>
+
+      <Card className="border-white/10 bg-[#101010] p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-zinc-100">Timeline des entrées</p>
+            <p className="text-xs text-zinc-500">20 éléments par lot</p>
+          </div>
+          <Button asChild variant="outline" className="border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10">
+            <Link href="/agent/entries/new">Nouvelle entrée</Link>
+          </Button>
+        </div>
+
+        {entries.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center text-sm text-zinc-400">
+            Aucune entrée trouvée pour le moment.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {entries.map((entry) => (
+              <article key={entry.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-orange-400/20 bg-orange-500/10 px-2.5 py-1 text-xs text-orange-300">
+                    {TYPE_ICONS[entry.typeEvenement.label.toLowerCase()] ?? '📌'} {entry.typeEvenement.label}
+                  </span>
+                  {entry.gravite ? (
+                    <span className={`rounded-full border px-2.5 py-1 text-xs ${SEVERITY_STYLES[entry.gravite]}`}>
+                      {entry.gravite}
+                    </span>
+                  ) : null}
+                  <span className="ml-auto text-xs text-zinc-500">{new Date(entry.timestamp).toLocaleString('fr-FR')}</span>
+                </div>
+                <p className="mt-3 text-sm text-zinc-200">{entry.description}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                  <span>👤 {entry.user.firstName} {entry.user.lastName}</span>
+                  {entry.localisation ? <span>📍 {entry.localisation}</span> : null}
+                </div>
+              </article>
+            ))}
+
+            {hasNext ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"
+                onClick={() => fetchEntries(page, false)}
+              >
+                Charger 20 entrées de plus
+              </Button>
+            ) : null}
+          </div>
+        )}
+      </Card>
+    </main>
+  );
+}
+*/
+
+'use client';
+
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { useOnlineStatus } from '@/hooks/use-online-status';
+import { useServiceWorker } from '@/hooks/use-service-worker';
+import { useSyncQueue } from '@/hooks/use-sync-queue';
+
 type Entry = {
   id: string;
   timestamp: string;
@@ -26,100 +166,176 @@ type Entry = {
   user: { firstName: string; lastName: string };
 };
 
-type FormValues = {
-  typeEvenementId: string;
-  description: string;
-  localisation: string;
-  gravite: '' | 'FAIBLE' | 'MOYENNE' | 'ELEVEE';
-  photo: FileList;
+const SEVERITY_STYLES: Record<'FAIBLE' | 'MOYENNE' | 'ELEVEE', string> = {
+  FAIBLE: 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300',
+  MOYENNE: 'border-amber-400/20 bg-amber-500/10 text-amber-300',
+  ELEVEE: 'border-red-400/20 bg-red-500/10 text-red-300',
 };
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
-const SEVERITY_CONFIG = {
-  FAIBLE:  { label: 'Faible',  dot: 'bg-emerald-400', badge: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' },
-  MOYENNE: { label: 'Moyenne', dot: 'bg-amber-400',   badge: 'bg-amber-400/10 text-amber-400 border-amber-400/20' },
-  ELEVEE:  { label: 'Élevée',  dot: 'bg-red-400',     badge: 'bg-red-400/10 text-red-400 border-red-400/20' },
-} as const;
-
 const TYPE_ICONS: Record<string, string> = {
-  ronde: '🔄', alarme: '🚨', anomalie: '⚠️', observation: '👁', intervention: '🚒',
+  ronde: '🔄',
+  alarme: '🚨',
+  anomalie: '⚠️',
+  observation: '👁️',
+  intervention: '🚒',
 };
 
 export function AgentDashboard() {
-  const formRef = useRef<HTMLElement | null>(null);
   const isOnline = useOnlineStatus();
-  const { pendingCount, enqueue, syncNow } = useSyncQueue();
+  const { pendingCount, syncNow } = useSyncQueue();
   useServiceWorker();
 
-  const [types, setTypes] = useState<EventType[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(true);
-  const [toastEntryId, setToastEntryId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [now, setNow] = useState(new Date());
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const defaultValues = useMemo(
-    () =>
-      loadDraft<Omit<FormValues, 'photo'>>('agent-entry-draft') ?? {
-        typeEvenementId: '',
-        description: '',
-        localisation: '',
-        gravite: '',
-      },
-    [],
-  );
-
-  const { register, handleSubmit, watch, reset, setError, formState } = useForm<FormValues>({
-    defaultValues,
-  });
-
-  const watchedValues = watch();
-  useDraftAutosave('agent-entry-draft', {
-    typeEvenementId: watchedValues.typeEvenementId,
-    description: watchedValues.description,
-    localisation: watchedValues.localisation,
-    gravite: watchedValues.gravite,
-  });
-
-  const fetchTypes = useCallback(async () => {
-    const res = await fetch('/api/entries/types');
-    if (!res.ok) return;
-    const payload = (await res.json()) as { data: EventType[] };
-    setTypes(payload.data);
-  }, []);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchEntries = useCallback(async (nextPage = 0, replace = false) => {
-    const res = await fetch(`/api/entries?take=20&page=${nextPage}`);
-    if (!res.ok) return;
-    const payload = (await res.json()) as { data: Entry[]; nextPage: number | null };
-    setEntries((prev) => (replace ? payload.data : [...prev, ...payload.data]));
+    setIsRefreshing(true);
+    const response = await fetch(`/api/entries?take=20&page=${nextPage}`);
+    if (!response.ok) {
+      setIsRefreshing(false);
+      return;
+    }
+    const payload = (await response.json()) as { data: Entry[]; nextPage: number | null };
+    setEntries((previous) => (replace ? payload.data : [...previous, ...payload.data]));
     setHasNext(payload.nextPage !== null);
     setPage(payload.nextPage ?? nextPage);
+    setIsRefreshing(false);
   }, []);
 
   useEffect(() => {
-    fetchTypes();
     fetchEntries(0, true);
-  }, [fetchEntries, fetchTypes]);
+  }, [fetchEntries]);
 
   useEffect(() => {
     if (!isOnline) return;
     syncNow().then(() => fetchEntries(0, true));
-  }, [isOnline, syncNow, fetchEntries]);
+  }, [fetchEntries, isOnline, syncNow]);
 
-  const uploadPhoto = useCallback(async (file?: File) => {
-    if (!file) return null;
-    if (!ALLOWED_FILE_TYPES.includes(file.type)) throw new Error('Format photo invalide (jpg/png/webp).');
+  const stats = useMemo(() => {
+    const total = entries.length;
+    const critical = entries.filter((entry) => entry.gravite === 'ELEVEE').length;
+    const medium = entries.filter((entry) => entry.gravite === 'MOYENNE').length;
+    const low = entries.filter((entry) => entry.gravite === 'FAIBLE').length;
+    const last = entries[0]?.timestamp;
+    return { total, critical, medium, low, last };
+  }, [entries]);
+
+  return (
+    <main className="mx-auto w-full max-w-6xl space-y-4 p-4">
+      <section className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.2),transparent_45%),#111111] p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Espace agent</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-100">Dashboard opérationnel</h1>
+            <p className="mt-1 text-sm text-zinc-400">Suivi des entrées du jour, statut réseau et file hors ligne.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={isOnline ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300' : 'border-red-400/20 bg-red-500/10 text-red-300'}>
+              {isOnline ? 'En ligne' : 'Hors ligne'}
+            </Badge>
+            <Badge className="border-white/10 bg-white/5 text-zinc-300">{pendingCount} en attente</Badge>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"
+              onClick={() => fetchEntries(0, true)}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? 'Actualisation...' : 'Actualiser'}
+            </Button>
+            <Button asChild className="bg-orange-500 text-white hover:bg-orange-400">
+              <Link href="/agent/entries/new">Créer une entrée</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {!isOnline ? (
+        <Card className="border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">
+          Mode hors ligne actif — vos prochaines entrées seront synchronisées automatiquement dès le retour du réseau.
+        </Card>
+      ) : null}
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="border-white/10 bg-[#111111] p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Entrées chargées</p>
+          <p className="mt-2 text-3xl font-semibold text-orange-300">{stats.total}</p>
+          <p className="mt-1 text-xs text-zinc-500">Page en cours</p>
+        </Card>
+        <Card className="border-white/10 bg-[#111111] p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Critiques</p>
+          <p className="mt-2 text-3xl font-semibold text-red-300">{stats.critical}</p>
+          <p className="mt-1 text-xs text-zinc-500">Gravité élevée</p>
+        </Card>
+        <Card className="border-white/10 bg-[#111111] p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Moyennes</p>
+          <p className="mt-2 text-3xl font-semibold text-amber-300">{stats.medium}</p>
+          <p className="mt-1 text-xs text-zinc-500">À surveiller</p>
+        </Card>
+        <Card className="border-white/10 bg-[#111111] p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Faibles</p>
+          <p className="mt-2 text-3xl font-semibold text-emerald-300">{stats.low}</p>
+          <p className="mt-1 text-xs text-zinc-500">Niveau bas</p>
+        </Card>
+      </section>
+
+      <Card className="border-white/10 bg-[#101010] p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-zinc-100">Timeline des entrées</p>
+            <p className="text-xs text-zinc-500">Dernière activité : {stats.last ? new Date(stats.last).toLocaleString('fr-FR') : 'aucune'}</p>
+          </div>
+          <Button asChild variant="outline" className="border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10">
+            <Link href="/agent/entries/new">Nouvelle entrée</Link>
+          </Button>
+        </div>
+
+        {entries.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center text-sm text-zinc-400">
+            Aucune entrée trouvée pour le moment.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {entries.map((entry) => (
+              <article key={entry.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-orange-400/20 bg-orange-500/10 px-2.5 py-1 text-xs text-orange-300">
+                    {TYPE_ICONS[entry.typeEvenement.label.toLowerCase()] ?? '📌'} {entry.typeEvenement.label}
+                  </span>
+                  {entry.gravite ? (
+                    <span className={`rounded-full border px-2.5 py-1 text-xs ${SEVERITY_STYLES[entry.gravite]}`}>
+                      {entry.gravite}
+                    </span>
+                  ) : null}
+                  <span className="ml-auto text-xs text-zinc-500">{new Date(entry.timestamp).toLocaleString('fr-FR')}</span>
+                </div>
+                <p className="mt-3 text-sm text-zinc-200">{entry.description}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                  <span>👤 {entry.user.firstName} {entry.user.lastName}</span>
+                  {entry.localisation ? <span>📍 {entry.localisation}</span> : null}
+                </div>
+              </article>
+            ))}
+
+            {hasNext ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"
+                onClick={() => fetchEntries(page, false)}
+              >
+                Charger 20 entrées de plus
+              </Button>
+            ) : null}
+          </div>
+        )}
+      </Card>
+    </main>
+  );
+}
+/*
     if (file.size > MAX_FILE_SIZE) throw new Error('Photo trop volumineuse (max 5MB).');
     const presign = await fetch('/api/uploads/presign', {
       method: 'POST',
@@ -216,7 +432,7 @@ export function AgentDashboard() {
           min-height:  100vh;
         }
 
-        /* Header */
+        /* Header * /
         .mc-header {
           position: sticky; top: 0; z-index: 50;
           background: rgba(10,11,14,0.85);
@@ -259,7 +475,7 @@ export function AgentDashboard() {
         .mc-pill-sync    { background: rgba(99,102,241,.1); color: #818cf8; border-color: rgba(99,102,241,.25); }
         .pill-dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
 
-        /* CTA Button */
+        /* CTA Button * /
         .mc-cta {
           margin: 20px 20px 0;
           width: calc(100% - 40px);
@@ -282,7 +498,7 @@ export function AgentDashboard() {
         .mc-cta:active { transform: translateY(0); }
         .mc-cta-icon { margin-right: 8px; font-size: 18px; }
 
-        /* Modal overlay */
+        /* Modal overlay * /
         .mc-overlay {
           position: fixed; inset: 0; z-index: 100;
           background: rgba(0,0,0,.7); backdrop-filter: blur(4px);
@@ -314,7 +530,7 @@ export function AgentDashboard() {
           font-family: var(--mono); letter-spacing: .05em;
         }
 
-        /* Form fields */
+        /* Form fields * /
         .mc-field { margin-bottom: 14px; }
         .mc-label {
           display: block; font-size: 10px; letter-spacing: .1em;
@@ -337,7 +553,7 @@ export function AgentDashboard() {
         .mc-textarea { resize: none; min-height: 90px; line-height: 1.6; }
         .mc-input::placeholder, .mc-textarea::placeholder { color: var(--muted); }
 
-        /* Severity chips */
+        /* Severity chips * /
         .mc-severity-row { display: flex; gap: 8px; }
         .mc-sev-chip {
           flex: 1; padding: 10px 0; border-radius: 10px;
@@ -350,7 +566,7 @@ export function AgentDashboard() {
         .mc-sev-chip.active-moyenne { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.4); color: #f59e0b; }
         .mc-sev-chip.active-elevee  { background: rgba(239,68,68,.1);   border-color: rgba(239,68,68,.4);   color: #ef4444; }
 
-        /* File upload */
+        /* File upload * /
         .mc-upload {
           width: 100%; padding: 14px;
           background: var(--surface2); border: 1px dashed var(--border2);
@@ -363,7 +579,7 @@ export function AgentDashboard() {
         .mc-upload:hover { border-color: var(--accent); color: var(--text); }
         .mc-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 
-        /* Submit */
+        /* Submit * /
         .mc-submit {
           width: 100%; padding: 15px;
           background: var(--accent); border: none; border-radius: 12px;
@@ -388,7 +604,7 @@ export function AgentDashboard() {
           font-size: 12px; color: #ef4444; margin-bottom: 12px;
         }
 
-        /* Section */
+        /* Section * /
         .mc-section { padding: 20px; }
         .mc-section-header {
           display: flex; align-items: center; justify-content: space-between;
@@ -403,7 +619,7 @@ export function AgentDashboard() {
         }
         .mc-divider { height: 1px; background: var(--border); margin: 0 20px; }
 
-        /* Entry card */
+        /* Entry card * /
         .mc-entry {
           padding: 14px 16px; border-radius: 12px;
           background: var(--surface2); border: 1px solid var(--border);
@@ -436,7 +652,7 @@ export function AgentDashboard() {
           letter-spacing: .05em; font-family: var(--mono); margin-left: 6px;
         }
 
-        /* Load more */
+        /* Load more * /
         .mc-load-more {
           width: 100%; padding: 12px;
           background: transparent; border: 1px solid var(--border);
@@ -446,7 +662,7 @@ export function AgentDashboard() {
         }
         .mc-load-more:hover { border-color: var(--border2); color: var(--text); }
 
-        /* Toast */
+        /* Toast * /
         .mc-toast {
           position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
           z-index: 200; min-width: 300px; max-width: calc(100vw - 40px);
@@ -472,7 +688,7 @@ export function AgentDashboard() {
           font-size: 16px; cursor: pointer; padding: 2px 4px;
         }
 
-        /* Offline banner */
+        /* Offline banner * /
         .mc-offline-banner {
           margin: 12px 20px 0;
           padding: 10px 14px; border-radius: 10px;
@@ -481,21 +697,21 @@ export function AgentDashboard() {
           display: flex; align-items: center; gap: 8px;
         }
 
-        /* Empty state */
+        /* Empty state * /
         .mc-empty {
           text-align: center; padding: 32px 16px;
           color: var(--muted); font-size: 13px;
         }
         .mc-empty-icon { font-size: 32px; margin-bottom: 8px; opacity: .4; }
 
-        /* Scrollbar */
+        /* Scrollbar * /
         .mc-sheet::-webkit-scrollbar { width: 4px; }
         .mc-sheet::-webkit-scrollbar-track { background: transparent; }
         .mc-sheet::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
       `}</style>
 
       <div className="mc-root">
-        {/* Header */}
+        {/* Header * /}
         <header className="mc-header">
           <div className="mc-logo">
             <div className="mc-logo-dot" />
@@ -518,20 +734,45 @@ export function AgentDashboard() {
           </div>
         </header>
 
-        {/* Offline banner */}
+        {/* Offline banner * /}
         {!isOnline && (
           <div className="mc-offline-banner">
             ⚡ Mode hors ligne — les entrées seront synchronisées au retour réseau
           </div>
         )}
 
-        {/* CTA */}
-        <button className="mc-cta" onClick={() => setShowForm(true)}>
-          <span className="mc-cta-icon">＋</span>
-          Nouvelle entrée
-        </button>
+        {/* CTA * /}
+        <div style={{ display: 'grid', gap: '10px', padding: '20px 20px 0' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px',
+            padding: '16px 18px', border: '1px solid var(--border)', borderRadius: '16px',
+            background: 'linear-gradient(135deg, rgba(249,115,22,.12), rgba(17,19,24,.95))',
+          }}>
+            <div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>
+                Ajouter une entrée rapidement
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '4px' }}>
+                Tu peux saisir en quelques secondes, même hors ligne.
+              </div>
+            </div>
+            <Link
+              href="/agent/entries/new"
+              style={{
+                padding: '10px 14px', borderRadius: '10px', background: 'var(--surface2)', border: '1px solid var(--border2)',
+                color: 'var(--text)', fontFamily: 'var(--mono)', fontSize: '12px', textDecoration: 'none', whiteSpace: 'nowrap',
+              }}
+            >
+              Ouvrir la page
+            </Link>
+          </div>
+          <button className="mc-cta" onClick={() => setShowForm(true)}>
+            <span className="mc-cta-icon">＋</span>
+            Nouvelle entrée
+          </button>
+        </div>
 
-        {/* Stats strip */}
+        {/* Stats strip * /}
         <div style={{ display: 'flex', gap: '10px', padding: '16px 20px 0', overflowX: 'auto' }}>
           {[
             { label: "Aujourd'hui", value: entries.length, icon: '📋' },
@@ -550,7 +791,7 @@ export function AgentDashboard() {
           ))}
         </div>
 
-        {/* Entries list */}
+        {/* Entries list * /}
         <div className="mc-section" style={{ paddingTop: '20px' }}>
           <div className="mc-section-header">
             <span className="mc-section-title">Dernières entrées</span>
@@ -608,7 +849,7 @@ export function AgentDashboard() {
         </div>
       </div>
 
-      {/* Form modal */}
+      {/* Form modal * /}
       {showForm && (
         <div className="mc-overlay" onClick={(e) => e.target === e.currentTarget && setShowForm(false)}>
           <div className="mc-sheet">
@@ -690,7 +931,7 @@ export function AgentDashboard() {
         </div>
       )}
 
-      {/* Undo toast */}
+      {/* Undo toast * /}
       {toastEntryId && (
         <div className="mc-toast">
           <span className="mc-toast-icon">✓</span>
@@ -705,3 +946,4 @@ export function AgentDashboard() {
     </>
   );
 }
+*/
