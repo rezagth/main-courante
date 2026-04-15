@@ -1,6 +1,21 @@
-# Operations Runbook
+# Operations Guide
 
-## Onboarding tenant
+## Architecture Overview
+
+Main Courante is a cloud-native multi-tenant SaaS with the following stack:
+
+- **Frontend**: Next.js 16 + React 19
+- **Backend**: Next.js API Routes
+- **Database**: PostgreSQL 16+ (managed)
+- **Cache**: Redis 7+
+- **Storage**: AWS S3 + CloudFront CDN
+- **Monitoring**: Sentry + custom JSON logs
+- **Payments**: Stripe
+- **Authentication**: NextAuth.js v5
+
+---
+
+## Tenant Onboarding
 - API: `POST /api/onboarding/tenant`
 - Payload: `name`, `domain`, `adminEmail`, `tempPassword`, `inviteEmails[]`
 - Provisioning automatique:

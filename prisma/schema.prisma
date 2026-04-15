@@ -36,6 +36,11 @@ model Tenant {
   logoUrl   String?  @map("logo_url")
   isActive  Boolean  @default(true) @map("is_active")
   lastActivityAt DateTime? @map("last_activity_at") @db.Timestamptz(6)
+  
+  // Billing & Stripe
+  stripeCustomerId String? @unique @map("stripe_customer_id")
+  stripeSubscriptionId String? @map("stripe_subscription_id")
+  
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
