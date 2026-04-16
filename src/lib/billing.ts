@@ -1,17 +1,23 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is required');
-}
+export const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2023-10-16',
+    })
+  : null;
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-04-10',
-});
+function getStripeOrThrow(): Stripe {
+  if (!stripe) {
+    throw new Error('STRIPE_SECRET_KEY is required');
+  }
+  return stripe;
+}
 
 export async function createStripeCustomer(tenantId: string, email: string, name: string) {
   try {
-    const customer = await stripe.customers.create({
+    const stripeClient = getStripeOrThrow();
+    const customer = await stripeClient.customers.create({
       email,
       name,
       metadata: {
@@ -38,6 +44,7 @@ export async function createStripeSubscription(
   trialDays?: number
 ) {
   try {
+    const stripeClient = getStripeOrThrow();
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { stripeCustomerId: true },
@@ -47,7 +54,7 @@ export async function createStripeSubscription(
       throw new Error('Tenant has no Stripe customer ID');
     }
 
-    const subscription = await stripe.subscriptions.create({
+    const subscription = await stripeClient.subscriptions.create({
       customer: tenant.stripeCustomerId,
       items: [{ price: priceId }],
       trial_period_days: trialDays || 14,
@@ -127,8 +134,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
+  const stripeClient = getStripeOrThrow();
   const tenantId = invoice.subscription
-    ? (await stripe.subscriptions.retrieve(invoice.subscription as string)).metadata?.tenantId
+    ? (await stripeClient.subscriptions.retrieve(invoice.subscription as string)).metadata?.tenantId
     : null;
 
   if (!tenantId) return;
@@ -138,8 +146,9 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
+  const stripeClient = getStripeOrThrow();
   const tenantId = invoice.subscription
-    ? (await stripe.subscriptions.retrieve(invoice.subscription as string)).metadata?.tenantId
+    ? (await stripeClient.subscriptions.retrieve(invoice.subscription as string)).metadata?.tenantId
     : null;
 
   if (!tenantId) return;

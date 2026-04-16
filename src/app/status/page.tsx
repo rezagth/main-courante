@@ -1,5 +1,7 @@
+import { getAppBaseUrl } from '@/lib/site-url';
+
 async function getStatus() {
-  const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+  const base = getAppBaseUrl();
   const res = await fetch(`${base}/api/status`, { cache: 'no-store' });
   if (!res.ok) return null;
   return (await res.json()) as {

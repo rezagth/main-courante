@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as { prisma?: any };
 const tenantStorage = new AsyncLocalStorage<{ tenantId: string }>();
 const globalForPg = globalThis as unknown as { pgPool?: Pool };
 
@@ -65,11 +65,14 @@ if (!dbUrl) {
   throw new Error('DATABASE_URL is required for Prisma runtime');
 }
 
+const isVercel = process.env.VERCEL === '1';
+const poolMax = Number(process.env.PG_POOL_MAX ?? (isVercel ? 3 : 10));
+
 const pgPool =
   globalForPg.pgPool ??
   new Pool({
     connectionString: dbUrl,
-    max: 10,
+    max: poolMax,
   });
 
 if (process.env.NODE_ENV !== 'production') {
@@ -77,7 +80,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const prismaAdmin = new PrismaClient({
-  adapter: new PrismaPg(pgPool),
+  adapter: new PrismaPg(pgPool as any),
 });
 
 const prismaBase = prismaAdmin.$extends({

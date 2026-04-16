@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prismaAdmin } from '@/lib/prisma';
 
 type AuditInput = {
@@ -7,7 +8,7 @@ type AuditInput = {
   action: string;
   resource: string;
   ip?: string | null;
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.InputJsonValue;
 };
 
 export async function logAuditEvent(input: AuditInput) {

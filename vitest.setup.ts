@@ -2,9 +2,10 @@ import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import 'dotenv/config';
 
 // Mock environment variables for tests
-process.env.NODE_ENV = 'test';
-process.env.NEXTAUTH_SECRET = 'test-secret-key-for-testing-only';
-process.env.NEXTAUTH_URL = 'http://localhost:3000';
+const env = process.env as Record<string, string | undefined>;
+env.NODE_ENV = 'test';
+env.NEXTAUTH_SECRET = 'test-secret-key-for-testing-only';
+env.NEXTAUTH_URL = 'http://localhost:3000';
 
 // Mock fetch globally if needed
 global.fetch = vi.fn();

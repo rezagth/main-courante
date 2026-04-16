@@ -380,7 +380,7 @@ async function run() {
   console.log(`Login: ${adminEmail}`);
   console.log(`Mot de passe: ${adminPassword}`);
   console.log('--- Comptes de test supplementaires ---');
-  console.log('Patron: patron@demo.local / Patron1234! -> /patron/dashboard');
+  console.log('Patron: patron@demo.local / Patron1234! -> /atron/dashboard');
   console.log('Chef:   chef@demo.local / Chef1234!   -> /chef/dashboard');
   console.log('Agent:  agent@demo.local / Agent1234! -> /agent/dashboard');
   console.log('Client: client@demo.local / Client1234! -> /client/dashboard');

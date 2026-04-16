@@ -1,5 +1,65 @@
 # Deployment Guide
 
+## Vercel Deployment (Recommended)
+
+### 1) Import Project
+
+- Push code to GitHub
+- In Vercel: **Add New Project** -> import repository
+- Framework preset: **Next.js**
+- Root directory: `./`
+
+### 2) Build Settings
+
+- Install command: `pnpm install --frozen-lockfile`
+- Build command: `pnpm build`
+- Output: Next.js default
+
+### 3) Required Environment Variables (Vercel)
+
+Set these in **Project Settings -> Environment Variables**:
+
+- `DATABASE_URL` (Neon/Supabase/Managed Postgres with pooling)
+- `AUTH_SECRET` (long random string)
+- `NEXTAUTH_URL` (your Vercel domain, e.g. `https://your-app.vercel.app`)
+
+Optional but recommended:
+
+- `REDIS_URL`
+- `SENTRY_DSN`
+- `NEXT_PUBLIC_SENTRY_DSN`
+- `AWS_REGION`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `S3_BUCKET_NAME`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+
+### 4) Database Migrations (Production)
+
+Run migrations before/after first production deploy from your terminal/CI:
+
+```bash
+pnpm exec prisma migrate deploy
+```
+
+### 5) Stripe Webhook
+
+In Stripe Dashboard, set endpoint to:
+
+- `https://<your-domain>/api/webhooks/stripe`
+
+And copy signing secret into `STRIPE_WEBHOOK_SECRET` on Vercel.
+
+### 6) Post-Deploy Smoke Checks
+
+- `/api/health`
+- `/api/status`
+- login flow
+- create one entry
+
+---
+
 ## Quick Start
 
 ### Local Development

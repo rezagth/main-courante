@@ -292,6 +292,7 @@ export function ClientDashboard() {
     });
     return Array.from(map.entries()).map(([day, count]) => ({ day, count }));
   }, [data?.trend]);
+  const nextPage = data?.nextPage;
 
   return (
     <>
@@ -447,8 +448,10 @@ export function ClientDashboard() {
                 </button>
                 <button
                   className="db-pg-btn"
-                  onClick={() => data?.nextPage !== null && setPage(data.nextPage!)}
-                  disabled={data?.nextPage === null}
+                  onClick={() => {
+                    if (typeof nextPage === 'number') setPage(nextPage);
+                  }}
+                  disabled={nextPage === null || nextPage === undefined}
                 >
                   Suivant →
                 </button>

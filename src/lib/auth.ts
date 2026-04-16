@@ -1,4 +1,4 @@
-import NextAuth from 'next-auth';
+import NextAuth, { getServerSession, type NextAuthOptions } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { verify as verifyArgon2 } from 'argon2';
 import { randomUUID } from 'node:crypto';
@@ -15,9 +15,8 @@ async function storeServerSession(jti: string, payload: Record<string, unknown>)
   await redis.set(`session:${jti}`, JSON.stringify(payload), 'EX', SESSION_TTL_SECONDS);
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET ?? 'dev-only-secret-change-me',
-  trustHost: true,
+export const authOptions: NextAuthOptions = {
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? 'dev-only-secret-change-me',
   session: { strategy: 'jwt', maxAge: SESSION_TTL_SECONDS },
   providers: [
     Credentials({
@@ -29,7 +28,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials, request) {
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
-        const ip = extractIp(request.headers.get('x-forwarded-for'));
+        const xForwardedFor =
+          (request as any)?.headers?.['x-forwarded-for'] ??
+          (request as any)?.headers?.get?.('x-forwarded-for') ??
+          null;
+        const ip = extractIp(Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor);
 
         await assertLoginRateLimit(ip);
 
@@ -83,6 +86,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      try {
+        const parsed = new URL(url);
+        if (parsed.origin === baseUrl) return url;
+      } catch {
+        // ignore invalid URL and fallback below
+      }
+      return baseUrl;
+    },
     async jwt({ token, user }) {
       const now = Math.floor(Date.now() / 1000);
       const currentJti = (token.sessionJti as string | undefined) ?? randomUUID();
@@ -133,5 +146,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       await redis.del(`session:${jti}`);
     },
   },
-});
+};
+
+const handler = NextAuth(authOptions);
+
+export const handlers = {
+  GET: handler,
+  POST: handler,
+};
+
+export async function auth() {
+  return getServerSession(authOptions);
+}
 

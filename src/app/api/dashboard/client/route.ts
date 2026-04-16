@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
+import { Gravite } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { requireAnyRole } from '@/lib/authorization';
 import { cachedJson } from '@/lib/cache';
 import { prismaAdmin } from '@/lib/prisma';
+
+function parseGravite(value: string | null): Gravite | undefined {
+  if (!value) return undefined;
+  return Object.values(Gravite).includes(value as Gravite) ? (value as Gravite) : undefined;
+}
 
 function buildWhere(searchParams: URLSearchParams) {
   const now = new Date();
@@ -13,32 +20,34 @@ function buildWhere(searchParams: URLSearchParams) {
   const typeId = searchParams.get('typeId') || undefined;
   const agentId = searchParams.get('agentId') || undefined;
   const siteId = searchParams.get('siteId') || undefined;
-  const gravite = searchParams.get('gravite') || undefined;
+  const gravite = parseGravite(searchParams.get('gravite'));
   const query = searchParams.get('q') || undefined;
   const take = Math.min(Number(searchParams.get('take') ?? '20'), 100);
   const page = Math.max(Number(searchParams.get('page') ?? '0'), 0);
+
+  const where: Prisma.EntreeMainCouranteWhereInput = {
+    deletedAt: null,
+    timestamp: { gte: from, lte: to },
+    ...(typeId ? { typeEvenementId: typeId } : {}),
+    ...(agentId ? { userId: agentId } : {}),
+    ...(siteId ? { siteId } : {}),
+    ...(gravite ? { gravite } : {}),
+    ...(query
+      ? {
+          OR: [
+            { description: { contains: query, mode: 'insensitive' } },
+            { localisation: { contains: query, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+  };
 
   return {
     from,
     to,
     take,
     page,
-    where: {
-      deletedAt: null,
-      timestamp: { gte: from, lte: to },
-      ...(typeId ? { typeEvenementId: typeId } : {}),
-      ...(agentId ? { userId: agentId } : {}),
-      ...(siteId ? { siteId } : {}),
-      ...(gravite ? { gravite } : {}),
-      ...(query
-        ? {
-            OR: [
-              { description: { contains: query, mode: 'insensitive' as const } },
-              { localisation: { contains: query, mode: 'insensitive' as const } },
-            ],
-          }
-        : {}),
-    },
+    where,
   };
 }
 

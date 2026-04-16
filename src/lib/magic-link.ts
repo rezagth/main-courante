@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { prismaAdmin } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { getAppBaseUrl } from '@/lib/site-url';
 
 export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -21,7 +22,7 @@ export async function createInvitationLink(tenantId: string, email: string, crea
     },
   });
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+  const baseUrl = getAppBaseUrl();
   const url = `${baseUrl}/onboarding/accept?token=${token}`;
   logger.info('magic_link_created', { tenantId, email });
   return url;

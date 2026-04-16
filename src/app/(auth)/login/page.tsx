@@ -1,10 +1,10 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, Suspense, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const params = useSearchParams();
   const callbackUrl = params.get('callbackUrl') ?? '/';
   const [email, setEmail] = useState('');
@@ -18,20 +18,21 @@ export default function LoginPage() {
     setError(null);
     setIsLoading(true);
 
+    const target = callbackUrl.startsWith('/') ? callbackUrl : '/';
     const result = await signIn('credentials', {
       email,
       password,
       redirect: false,
-      callbackUrl,
+        callbackUrl: target,
     });
 
     setIsLoading(false);
-    if (!result || result.error) {
+    if (!result || result.error || result.ok === false) {
       setError('Identifiants invalides. Vérifiez votre email et mot de passe.');
       return;
     }
 
-    window.location.href = result.url ?? callbackUrl;
+    window.location.replace(result.url ?? target);
   }
 
   return (
@@ -451,5 +452,13 @@ export default function LoginPage() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

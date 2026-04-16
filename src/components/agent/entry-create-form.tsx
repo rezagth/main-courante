@@ -34,6 +34,10 @@ const SEVERITY_CONFIG = {
   ELEVEE: { label: 'Élevée', className: 'border-red-400/20 bg-red-400/10 text-red-300' },
 } as const;
 
+function isValidGravite(value: unknown): value is FormValues['gravite'] {
+  return value === '' || value === 'FAIBLE' || value === 'MOYENNE' || value === 'ELEVEE';
+}
+
 export function EntryCreateForm() {
   const isOnline = useOnlineStatus();
   const { pendingCount, enqueue } = useSyncQueue();
@@ -44,16 +48,22 @@ export function EntryCreateForm() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const defaultValues = useMemo(
-    () =>
-      loadDraft<Omit<FormValues, 'photo'>>('agent-entry-draft') ?? {
+  const defaultValues = useMemo<Omit<FormValues, 'photo'>>(() => {
+    const draft = loadDraft<Omit<FormValues, 'photo'>>('agent-entry-draft');
+    if (!draft) {
+      return {
         typeEvenementId: '',
         description: '',
         localisation: '',
         gravite: '',
-      },
-    [],
-  );
+      };
+    }
+
+    return {
+      ...draft,
+      gravite: isValidGravite(draft.gravite) ? draft.gravite : '',
+    };
+  }, []);
 
   const { register, handleSubmit, watch, reset, setError, formState } = useForm<FormValues>({ defaultValues });
   const watchedValues = watch();
