@@ -1,5 +1,4 @@
-# Main Courante Electronique
-
+# Main Courante Electronique securite
 Application SaaS multi-tenant pour la main courante d'agents de securite incendie.
 
 ## Fonctionnalites principales
