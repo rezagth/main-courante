@@ -8,7 +8,7 @@ type Payload = {
   status: 'ok' | 'degraded';
   uptimeSeconds: number;
   db: boolean;
-  s3: boolean;
+  storage: boolean;
 };
 
 export function AgentAnalyticsStatus() {
@@ -33,7 +33,7 @@ export function AgentAnalyticsStatus() {
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-sm text-zinc-300">Statut: <span className={data?.status === 'ok' ? 'text-emerald-400' : 'text-red-400'}>{data?.status ?? '...'}</span></div>
           <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-sm text-zinc-300">DB: <span className={data?.db ? 'text-emerald-400' : 'text-red-400'}>{data?.db ? 'OK' : 'KO'}</span></div>
-          <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-sm text-zinc-300">S3: <span className={data?.s3 ? 'text-emerald-400' : 'text-red-400'}>{data?.s3 ? 'OK' : 'KO'}</span></div>
+          <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-sm text-zinc-300">Stockage photo: <span className={data?.storage ? 'text-emerald-400' : 'text-red-400'}>{data?.storage ? 'OK' : 'KO'}</span></div>
         </div>
       </Panel>
     </AnalyticsShell>

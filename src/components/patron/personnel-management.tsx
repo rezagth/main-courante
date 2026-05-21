@@ -14,18 +14,21 @@ type UserRow = {
   isActive: boolean;
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
   roleCode: string | null;
-  siteId: string | null;
   assignmentSiteId: string | null;
-  assignmentTeamId: string | null;
+  locationAssignments?: Array<{ siteId: string; locationId: string | null }>;
+  managedSiteIds?: string[];
 };
 
-type Option = { id: string; code?: string; name?: string; label?: string };
+type RoleOption = { id: string; code: string; label: string };
+type SiteOption = { id: string; code: string; name: string };
+type LocationOption = { id: string; code: string; name: string; siteId: string };
 
 type Payload = {
   users: UserRow[];
-  roles: Array<{ id: string; code: string; label: string }>;
-  sites: Array<{ id: string; code: string; name: string }>;
+  roles: RoleOption[];
+  sites: SiteOption[];
   teams: Array<{ id: string; code: string; name: string; siteId: string }>;
+  locations?: LocationOption[];
 };
 
 const DEFAULT_FORM = {
@@ -35,7 +38,8 @@ const DEFAULT_FORM = {
   password: '',
   roleCode: 'AGENT',
   siteId: '',
-  teamId: '',
+  locationId: '',
+  managedSiteId: '',
 };
 
 export function PersonnelManagement() {
@@ -45,6 +49,24 @@ export function PersonnelManagement() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [filterSiteId, setFilterSiteId] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+  const [draftByUserId, setDraftByUserId] = useState<
+    Record<
+      string,
+      {
+        email: string;
+        firstName: string;
+        lastName: string;
+        status: UserRow['status'];
+        roleCode: string;
+        hospitalId: string;
+        locationId: string;
+        managedHospitalId: string;
+        password: string;
+      }
+    >
+  >({});
 
   const load = async () => {
     setLoading(true);
@@ -62,17 +84,65 @@ export function PersonnelManagement() {
     load();
   }, []);
 
-  const teamsBySite = useMemo(() => {
-    const teams = data?.teams ?? [];
-    const map = new Map<string, Option[]>();
-    for (const team of teams) {
-      const key = team.siteId;
-      const current = map.get(key) ?? [];
-      current.push(team);
-      map.set(key, current);
+  const locationsBySite = useMemo(() => {
+    const map = new Map<string, LocationOption[]>();
+    for (const location of data?.locations ?? []) {
+      const current = map.get(location.siteId) ?? [];
+      current.push(location);
+      map.set(location.siteId, current);
     }
     return map;
   }, [data]);
+
+  const filteredUsers = useMemo(() => {
+    return (data?.users ?? []).filter((user) => {
+      if (filterSiteId && user.assignmentSiteId !== filterSiteId) return false;
+      if (filterRole && user.roleCode !== filterRole) return false;
+      return true;
+    });
+  }, [data, filterSiteId, filterRole]);
+
+  const getPrimaryLocationId = (user: UserRow): string => {
+    return user.locationAssignments?.[0]?.locationId ?? '';
+  };
+
+  const getManagedSiteId = (user: UserRow): string => {
+    return user.managedSiteIds?.[0] ?? '';
+  };
+
+  const displayRoleLabel = (label: string): string => {
+    return label
+      .replace(/équipe/gi, 'hôpital')
+      .replace(/equipe/gi, 'hopital');
+  };
+
+  const startEditing = (user: UserRow) => {
+    setEditingId(user.id);
+    setDraftByUserId((prev) => ({
+      ...prev,
+      [user.id]: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        status: user.status,
+        roleCode: user.roleCode ?? 'AGENT',
+        hospitalId: user.assignmentSiteId ?? '',
+        locationId: getPrimaryLocationId(user),
+        managedHospitalId: getManagedSiteId(user),
+        password: '',
+      },
+    }));
+  };
+
+  const patchDraft = (userId: string, patch: Partial<(typeof draftByUserId)[string]>) => {
+    setDraftByUserId((prev) => ({
+      ...prev,
+      [userId]: {
+        ...prev[userId],
+        ...patch,
+      },
+    }));
+  };
 
   const handleCreate = async () => {
     if (!form.email || !form.firstName || !form.lastName || !form.password || !form.roleCode) {
@@ -93,7 +163,8 @@ export function PersonnelManagement() {
         password: form.password,
         roleCode: form.roleCode,
         siteId: form.siteId || null,
-        teamId: form.teamId || null,
+        locationAssignments: form.siteId ? [{ siteId: form.siteId, locationId: form.locationId || null }] : [],
+        managedSiteIds: form.roleCode === 'CHEF_EQUIPE' && form.managedSiteId ? [form.managedSiteId] : [],
       }),
     });
 
@@ -118,20 +189,24 @@ export function PersonnelManagement() {
     await load();
   };
 
-  const updateRow = async (user: UserRow, patch: Partial<UserRow> & { password?: string }) => {
+  const saveUser = async (user: UserRow) => {
+    const draft = draftByUserId[user.id];
+    if (!draft) return;
+
     const res = await fetch(`/api/patron/personnel/${user.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: patch.email ?? user.email,
-        firstName: patch.firstName ?? user.firstName,
-        lastName: patch.lastName ?? user.lastName,
-        status: patch.status ?? user.status,
-        isActive: patch.isActive ?? user.isActive,
-        roleCode: patch.roleCode ?? user.roleCode ?? 'AGENT',
-        siteId: patch.assignmentSiteId ?? user.assignmentSiteId ?? null,
-        teamId: patch.assignmentTeamId ?? user.assignmentTeamId ?? null,
-        ...(patch.password ? { password: patch.password } : {}),
+        email: draft.email,
+        firstName: draft.firstName,
+        lastName: draft.lastName,
+        status: draft.status,
+        isActive: user.isActive,
+        roleCode: draft.roleCode,
+        siteId: draft.hospitalId || null,
+        locationAssignments: draft.hospitalId ? [{ siteId: draft.hospitalId, locationId: draft.locationId || null }] : [],
+        managedSiteIds: draft.roleCode === 'CHEF_EQUIPE' && draft.managedHospitalId ? [draft.managedHospitalId] : [],
+        ...(draft.password ? { password: draft.password } : {}),
       }),
     });
 
@@ -149,6 +224,7 @@ export function PersonnelManagement() {
       return;
     }
     setMessage('Mise à jour effectuée.');
+    setEditingId(null);
     await load();
   };
 
@@ -165,16 +241,16 @@ export function PersonnelManagement() {
   return (
     <main className="mx-auto w-full max-w-7xl space-y-4 p-4">
       <section className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.16),transparent_45%),#111111] p-5 md:p-6">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Patron · Personnel</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-100">Gestion du personnel</h1>
-        <p className="mt-2 text-sm text-zinc-400">Création, modification, affectation des rôles, sites et équipes.</p>
+        <p suppressHydrationWarning className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Patron · Utilisateurs</p>
+        <h1 suppressHydrationWarning className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-100">Gestion des utilisateurs</h1>
+        <p suppressHydrationWarning className="mt-2 text-sm text-zinc-400">Simple: créer, affecter à un hôpital/endroit, et choisir le chef d'hôpital.</p>
       </section>
 
       {message ? <p className="text-sm text-amber-200">{message}</p> : null}
 
       <Card className="space-y-3 border-white/10 bg-[#111111] p-4">
         <h2 className="text-sm font-medium text-zinc-100">Créer un utilisateur</h2>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-4">
           <Input value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="Email" className="border-white/10 bg-[#0f0f0f] text-zinc-100" />
           <Input value={form.firstName} onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))} placeholder="Prénom" className="border-white/10 bg-[#0f0f0f] text-zinc-100" />
           <Input value={form.lastName} onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))} placeholder="Nom" className="border-white/10 bg-[#0f0f0f] text-zinc-100" />
@@ -186,7 +262,7 @@ export function PersonnelManagement() {
             className="border-white/10 bg-[#0f0f0f] text-zinc-100"
           >
             {(data?.roles ?? []).map((role) => (
-              <option key={role.id} value={role.code}>{role.label}</option>
+              <option key={role.id} value={role.code}>{displayRoleLabel(role.label)}</option>
             ))}
           </Select>
 
@@ -194,24 +270,35 @@ export function PersonnelManagement() {
             value={form.siteId}
             onChange={(e) => {
               const siteId = e.target.value;
-              setForm((p) => ({ ...p, siteId, teamId: '' }));
+              setForm((p) => ({ ...p, siteId, locationId: '' }));
             }}
             className="border-white/10 bg-[#0f0f0f] text-zinc-100"
           >
-            <option value="">Aucun site</option>
-            {(data?.sites ?? []).map((site) => (
-              <option key={site.id} value={site.id}>{site.name}</option>
+            <option value="">Aucun hôpital</option>
+            {(data?.sites ?? []).map((hospital) => (
+              <option key={hospital.id} value={hospital.id}>{hospital.name}</option>
             ))}
           </Select>
 
           <Select
-            value={form.teamId}
-            onChange={(e) => setForm((p) => ({ ...p, teamId: e.target.value }))}
+            value={form.locationId}
+            onChange={(e) => setForm((p) => ({ ...p, locationId: e.target.value }))}
             className="border-white/10 bg-[#0f0f0f] text-zinc-100"
           >
-            <option value="">Aucune équipe</option>
-            {(teamsBySite.get(form.siteId) ?? []).map((team) => (
-              <option key={team.id} value={team.id}>{team.name}</option>
+            <option value="">Aucun endroit</option>
+            {(locationsBySite.get(form.siteId) ?? []).map((location) => (
+              <option key={location.id} value={location.id}>{location.name}</option>
+            ))}
+          </Select>
+
+          <Select
+            value={form.managedSiteId}
+            onChange={(e) => setForm((p) => ({ ...p, managedSiteId: e.target.value }))}
+            className="border-white/10 bg-[#0f0f0f] text-zinc-100"
+          >
+            <option value="">Hôpital géré (chef)</option>
+            {(data?.sites ?? []).map((hospital) => (
+              <option key={hospital.id} value={hospital.id}>{hospital.name}</option>
             ))}
           </Select>
         </div>
@@ -224,65 +311,121 @@ export function PersonnelManagement() {
       <Card className="space-y-3 border-white/10 bg-[#111111] p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-zinc-100">Utilisateurs</h2>
+          <div className="flex items-center gap-2">
+            <Select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} className="h-9 w-44 border-white/10 bg-[#0f0f0f] text-zinc-100">
+              <option value="">Tous rôles</option>
+              {(data?.roles ?? []).map((role) => (
+                <option key={role.id} value={role.code}>{displayRoleLabel(role.label)}</option>
+              ))}
+            </Select>
+            <Select value={filterSiteId} onChange={(e) => setFilterSiteId(e.target.value)} className="h-9 w-56 border-white/10 bg-[#0f0f0f] text-zinc-100">
+              <option value="">Tous hôpitaux</option>
+              {(data?.sites ?? []).map((hospital) => (
+                <option key={hospital.id} value={hospital.id}>{hospital.name}</option>
+              ))}
+            </Select>
           <Button variant="outline" className="border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10" onClick={load}>
             Actualiser
           </Button>
+          </div>
         </div>
 
         {loading && !data ? <p className="text-sm text-zinc-500">Chargement...</p> : null}
 
         <div className="space-y-3">
-          {(data?.users ?? []).map((user) => {
-            const teamOptions = teamsBySite.get(user.assignmentSiteId ?? '') ?? [];
+          {filteredUsers.map((user) => {
             const isEditing = editingId === user.id;
+            const draft = draftByUserId[user.id];
+            const effectiveHospitalId = isEditing ? draft?.hospitalId ?? '' : user.assignmentSiteId ?? '';
+            const effectiveLocationId = isEditing ? draft?.locationId ?? '' : getPrimaryLocationId(user);
+            const effectiveManagedHospitalId = isEditing ? draft?.managedHospitalId ?? '' : getManagedSiteId(user);
             return (
               <article key={user.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <div className="grid gap-2 md:grid-cols-6">
-                  <Input defaultValue={user.firstName} className="border-white/10 bg-[#0f0f0f] text-zinc-100" onBlur={(e) => isEditing && updateRow(user, { firstName: e.target.value })} />
-                  <Input defaultValue={user.lastName} className="border-white/10 bg-[#0f0f0f] text-zinc-100" onBlur={(e) => isEditing && updateRow(user, { lastName: e.target.value })} />
-                  <Input defaultValue={user.email} className="border-white/10 bg-[#0f0f0f] text-zinc-100 md:col-span-2" onBlur={(e) => isEditing && updateRow(user, { email: e.target.value })} />
+                <div className="grid gap-2 md:grid-cols-4">
+                  <Input
+                    value={isEditing ? draft?.firstName ?? '' : user.firstName}
+                    className="border-white/10 bg-[#0f0f0f] text-zinc-100"
+                    onChange={(e) => isEditing && patchDraft(user.id, { firstName: e.target.value })}
+                    readOnly={!isEditing}
+                  />
+                  <Input
+                    value={isEditing ? draft?.lastName ?? '' : user.lastName}
+                    className="border-white/10 bg-[#0f0f0f] text-zinc-100"
+                    onChange={(e) => isEditing && patchDraft(user.id, { lastName: e.target.value })}
+                    readOnly={!isEditing}
+                  />
+                  <Input
+                    value={isEditing ? draft?.email ?? '' : user.email}
+                    className="border-white/10 bg-[#0f0f0f] text-zinc-100 md:col-span-2"
+                    onChange={(e) => isEditing && patchDraft(user.id, { email: e.target.value })}
+                    readOnly={!isEditing}
+                  />
 
                   <Select
-                    defaultValue={user.roleCode ?? 'AGENT'}
+                    value={isEditing ? draft?.roleCode ?? 'AGENT' : user.roleCode ?? 'AGENT'}
                     className="border-white/10 bg-[#0f0f0f] text-zinc-100"
-                    onChange={(e) => isEditing && updateRow(user, { roleCode: e.target.value })}
+                    onChange={(e) => {
+                      if (!isEditing) return;
+                      const roleCode = e.target.value;
+                      patchDraft(user.id, {
+                        roleCode,
+                        managedHospitalId: roleCode === 'CHEF_EQUIPE' ? effectiveManagedHospitalId : '',
+                      });
+                    }}
+                    disabled={!isEditing}
                   >
                     {(data?.roles ?? []).map((role) => (
-                      <option key={role.id} value={role.code}>{role.label}</option>
+                      <option key={role.id} value={role.code}>{displayRoleLabel(role.label)}</option>
                     ))}
                   </Select>
 
                   <Select
-                    defaultValue={user.status}
+                    value={isEditing ? draft?.status ?? 'ACTIVE' : user.status}
                     className="border-white/10 bg-[#0f0f0f] text-zinc-100"
-                    onChange={(e) => isEditing && updateRow(user, { status: e.target.value as UserRow['status'] })}
+                    onChange={(e) => isEditing && patchDraft(user.id, { status: e.target.value as UserRow['status'] })}
+                    disabled={!isEditing}
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="INACTIVE">INACTIVE</option>
                     <option value="SUSPENDED">SUSPENDED</option>
                   </Select>
-                </div>
 
-                <div className="mt-2 grid gap-2 md:grid-cols-4">
                   <Select
-                    defaultValue={user.assignmentSiteId ?? ''}
+                    value={effectiveHospitalId}
                     className="border-white/10 bg-[#0f0f0f] text-zinc-100"
-                    onChange={(e) => isEditing && updateRow(user, { assignmentSiteId: e.target.value || null, assignmentTeamId: null })}
+                    onChange={(e) => {
+                      if (!isEditing) return;
+                      patchDraft(user.id, { hospitalId: e.target.value, locationId: '' });
+                    }}
+                    disabled={!isEditing}
                   >
-                    <option value="">Aucun site</option>
-                    {(data?.sites ?? []).map((site) => (
-                      <option key={site.id} value={site.id}>{site.name}</option>
+                    <option value="">Aucun hôpital</option>
+                    {(data?.sites ?? []).map((hospital) => (
+                      <option key={hospital.id} value={hospital.id}>{hospital.name}</option>
                     ))}
                   </Select>
 
                   <Select
-                    defaultValue={user.assignmentTeamId ?? ''}
+                    value={effectiveLocationId}
                     className="border-white/10 bg-[#0f0f0f] text-zinc-100"
-                    onChange={(e) => isEditing && updateRow(user, { assignmentTeamId: e.target.value || null })}
+                    onChange={(e) => isEditing && patchDraft(user.id, { locationId: e.target.value })}
+                    disabled={!isEditing}
                   >
-                    <option value="">Aucune équipe</option>
-                    {teamOptions.map((team) => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
+                    <option value="">Aucun endroit</option>
+                    {(locationsBySite.get(effectiveHospitalId) ?? []).map((location) => (
+                      <option key={location.id} value={location.id}>{location.name}</option>
+                    ))}
+                  </Select>
+
+                  <Select
+                    value={effectiveManagedHospitalId}
+                    className="border-white/10 bg-[#0f0f0f] text-zinc-100"
+                    onChange={(e) => isEditing && patchDraft(user.id, { managedHospitalId: e.target.value })}
+                    disabled={!isEditing || (isEditing ? draft?.roleCode : user.roleCode) !== 'CHEF_EQUIPE'}
+                  >
+                    <option value="">Hôpital géré (chef)</option>
+                    {(data?.sites ?? []).map((hospital) => (
+                      <option key={hospital.id} value={hospital.id}>{hospital.name}</option>
                     ))}
                   </Select>
 
@@ -290,23 +433,43 @@ export function PersonnelManagement() {
                     type="password"
                     placeholder="Nouveau mot de passe"
                     className="border-white/10 bg-[#0f0f0f] text-zinc-100"
-                    onBlur={(e) => {
-                      if (!isEditing || !e.target.value) return;
-                      updateRow(user, { password: e.target.value });
-                      e.target.value = '';
-                    }}
+                    value={isEditing ? draft?.password ?? '' : ''}
+                    onChange={(e) => isEditing && patchDraft(user.id, { password: e.target.value })}
+                    readOnly={!isEditing}
                   />
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant={isEditing ? 'default' : 'outline'} className={isEditing ? 'bg-emerald-500 text-white hover:bg-emerald-400' : 'border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10'} onClick={() => setEditingId((current) => (current === user.id ? null : user.id))}>
-                      {isEditing ? 'Edition active' : 'Editer'}
+                <div className="mt-2 flex items-center gap-2">
+                  {!isEditing ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"
+                      onClick={() => startEditing(user)}
+                    >
+                      Editer
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => disableUser(user.id)}>Désactiver</Button>
-                  </div>
+                  ) : (
+                    <>
+                      <Button size="sm" className="bg-emerald-500 text-white hover:bg-emerald-400" onClick={() => saveUser(user)}>
+                        Enregistrer
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"
+                        onClick={() => setEditingId(null)}
+                      >
+                        Annuler
+                      </Button>
+                    </>
+                  )}
+                  <Button size="sm" variant="destructive" onClick={() => disableUser(user.id)}>Désactiver</Button>
                 </div>
               </article>
             );
           })}
+          {!loading && filteredUsers.length === 0 ? <p className="text-sm text-zinc-500">Aucun utilisateur trouvé pour ce filtre.</p> : null}
         </div>
       </Card>
     </main>

@@ -107,7 +107,11 @@ import { useSyncQueue } from '@/hooks/use-sync-queue';
         ) : (
           <div className="space-y-3">
             {entries.map((entry) => (
-              <article key={entry.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <Link
+                key={entry.id}
+                href={`/entries/${entry.id}`}
+                className="block rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05]"
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full border border-orange-400/20 bg-orange-500/10 px-2.5 py-1 text-xs text-orange-300">
                     {TYPE_ICONS[entry.typeEvenement.label.toLowerCase()] ?? '📌'} {entry.typeEvenement.label}
@@ -124,7 +128,7 @@ import { useSyncQueue } from '@/hooks/use-sync-queue';
                   <span>👤 {entry.user.firstName} {entry.user.lastName}</span>
                   {entry.localisation ? <span>📍 {entry.localisation}</span> : null}
                 </div>
-              </article>
+              </Link>
             ))}
 
             {hasNext ? (

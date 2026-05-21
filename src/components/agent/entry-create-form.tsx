@@ -25,7 +25,7 @@ type FormValues = {
   photo: FileList;
 };
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const SEVERITY_CONFIG = {
@@ -45,8 +45,8 @@ export function EntryCreateForm() {
 
   const [types, setTypes] = useState<EventType[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
 
   const defaultValues = useMemo<Omit<FormValues, 'photo'>>(() => {
     const draft = loadDraft<Omit<FormValues, 'photo'>>('agent-entry-draft');
@@ -67,6 +67,7 @@ export function EntryCreateForm() {
 
   const { register, handleSubmit, watch, reset, setError, formState } = useForm<FormValues>({ defaultValues });
   const watchedValues = watch();
+  const selectedPhoto = watchedValues.photo?.[0] ?? null;
 
   useDraftAutosave('agent-entry-draft', {
     typeEvenementId: watchedValues.typeEvenementId,
@@ -86,48 +87,66 @@ export function EntryCreateForm() {
     fetchTypes();
   }, [fetchTypes]);
 
-  const uploadPhoto = useCallback(async (file?: File) => {
-    if (!file) return null;
-    if (!ALLOWED_FILE_TYPES.includes(file.type)) throw new Error('Format photo invalide (jpg/png/webp).');
-    if (file.size > MAX_FILE_SIZE) throw new Error('Photo trop volumineuse (max 5MB).');
+  useEffect(() => {
+    if (!selectedPhoto) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
 
-    const presign = await fetch('/api/uploads/presign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
-    });
-    if (!presign.ok) throw new Error("Échec de génération d'URL d'upload");
-    const { uploadUrl, publicUrl } = (await presign.json()) as { uploadUrl: string; publicUrl: string };
+    const nextUrl = URL.createObjectURL(selectedPhoto);
+    setPhotoPreviewUrl(nextUrl);
 
-    const upload = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
-    if (!upload.ok) throw new Error("Échec d'upload photo");
-    return publicUrl;
-  }, []);
+    return () => {
+      URL.revokeObjectURL(nextUrl);
+    };
+  }, [selectedPhoto]);
 
   const onSubmit = handleSubmit(async (values) => {
     setIsSubmitting(true);
     try {
       const file = values.photo?.[0];
-      const nextPhotoUrl = file && isOnline ? await uploadPhoto(file) : photoUrl;
       const payload = {
         typeEvenementId: values.typeEvenementId,
         description: values.description.trim(),
         localisation: values.localisation.trim(),
         gravite: values.gravite || undefined,
-        photoUrl: nextPhotoUrl ?? undefined,
         timestamp: new Date().toISOString(),
       };
 
+      if (file && !ALLOWED_FILE_TYPES.includes(file.type)) {
+        throw new Error('Format photo invalide (jpg/png/webp).');
+      }
+      if (file && file.size > MAX_FILE_SIZE) {
+        throw new Error('Photo trop volumineuse (max 4MB).');
+      }
+
       if (isOnline) {
-        const response = await fetch('/api/entries', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+        const response = file
+          ? await (() => {
+              const formData = new FormData();
+              formData.set('typeEvenementId', payload.typeEvenementId);
+              formData.set('description', payload.description);
+              formData.set('localisation', payload.localisation);
+              if (payload.gravite) formData.set('gravite', payload.gravite);
+              formData.set('timestamp', payload.timestamp);
+              formData.set('photo', file);
+              return fetch('/api/entries', {
+                method: 'POST',
+                body: formData,
+              });
+            })()
+          : await fetch('/api/entries', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
         if (!response.ok) throw new Error('Impossible de créer entrée');
         const data = (await response.json()) as { data: { id: string } };
         setSuccessMessage(`Entrée créée avec l'identifiant ${data.data.id}`);
       } else {
+        if (file) {
+          throw new Error('Ajout de photo indisponible hors ligne. Reconnecte-toi pour envoyer la photo.');
+        }
         await enqueue({
           id: crypto.randomUUID(),
           ...payload,
@@ -139,7 +158,6 @@ export function EntryCreateForm() {
 
       localStorage.removeItem('agent-entry-draft');
       reset({ typeEvenementId: '', description: '', localisation: '', gravite: '' });
-      setPhotoUrl(null);
     } catch (error) {
       setError('root', { message: error instanceof Error ? error.message : 'Erreur inconnue' });
     } finally {
@@ -222,8 +240,22 @@ export function EntryCreateForm() {
             <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">Photo</label>
             <div className="relative overflow-hidden rounded-xl border border-dashed border-white/15 bg-white/5 px-4 py-5 text-center text-sm text-zinc-400">
               <input className="absolute inset-0 cursor-pointer opacity-0" type="file" accept="image/jpeg,image/png,image/webp" {...register('photo')} />
-              Appuie pour joindre une photo JPG, PNG ou WEBP
+              Appuie pour joindre une photo JPG, PNG ou WEBP (max 4MB)
             </div>
+            {selectedPhoto ? (
+              <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-xs text-zinc-300">
+                  Fichier sélectionné: {selectedPhoto.name} ({Math.round(selectedPhoto.size / 1024)} Ko)
+                </p>
+                {photoPreviewUrl ? (
+                  <img
+                    src={photoPreviewUrl}
+                    alt="Aperçu de la photo sélectionnée"
+                    className="max-h-52 w-full rounded-lg border border-white/10 object-contain"
+                  />
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-3 md:flex-row">

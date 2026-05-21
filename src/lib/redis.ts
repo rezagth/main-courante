@@ -1,6 +1,7 @@
 import { Redis } from 'ioredis';
 
-const redisUrl = process.env.REDIS_URL;
+const redisEnabled = process.env.REDIS_ENABLED === 'true';
+const redisUrl = redisEnabled ? process.env.REDIS_URL : null;
 
 type GlobalRedis = typeof globalThis & { __redis?: Redis };
 type GlobalRateLimitStore = typeof globalThis & {
@@ -19,25 +20,33 @@ const getClient = () => {
   return g.__redis;
 };
 
-export const redis = getClient();
+export function getRedisClient(): Redis | null {
+  return getClient();
+}
 
 export function getRedisOrThrow(): Redis {
-  if (!redis) {
+  const client = getRedisClient();
+  if (!client) {
     throw new Error('REDIS_URL is not configured');
   }
-  return redis;
+  return client;
 }
 
 export async function incrementWithWindow(
   key: string,
   windowSeconds: number,
 ): Promise<number> {
+  const redis = getRedisClient();
   if (redis) {
-    const count = await redis.incr(key);
-    if (count === 1) {
-      await redis.expire(key, windowSeconds);
+    try {
+      const count = await redis.incr(key);
+      if (count === 1) {
+        await redis.expire(key, windowSeconds);
+      }
+      return count;
+    } catch {
+      // Fall back to the in-memory counter when Redis is configured but unavailable.
     }
-    return count;
   }
 
   // Dev fallback when REDIS_URL is not configured.

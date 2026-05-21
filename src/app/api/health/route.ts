@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
+import { prismaAdmin } from '@/lib/prisma';
+import { getRedisClient } from '@/lib/redis';
 
 export async function GET() {
   try {
-    // Quick health check - can be expanded to check DB, Redis, etc.
+    await prismaAdmin.$queryRaw`SELECT 1`;
+
+    const redis = getRedisClient();
+    if (redis) {
+      await redis.ping();
+    }
+
     return NextResponse.json(
       {
         status: 'healthy',

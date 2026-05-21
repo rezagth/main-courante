@@ -34,17 +34,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invitation invalide ou expiree' }, { status: 400 });
   }
 
+  const normalizedEmail = invitation.email.trim().toLowerCase();
   const passwordHash = await hashArgon2(password);
   await prismaAdmin.user.upsert({
     where: {
       tenantId_email: {
         tenantId: invitation.tenantId,
-        email: invitation.email,
+        email: normalizedEmail,
       },
     },
     create: {
       tenantId: invitation.tenantId,
-      email: invitation.email,
+      email: normalizedEmail,
       firstName,
       lastName,
       passwordHash,
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
     update: {
       firstName,
       lastName,
+      email: normalizedEmail,
       passwordHash,
       isActive: true,
       status: 'ACTIVE',

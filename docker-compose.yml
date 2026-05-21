@@ -45,7 +45,7 @@ services:
       REDIS_URL: redis://redis:6379
       NODE_ENV: development
       NEXTAUTH_URL: http://localhost:3000
-      AUTH_SECRET: dev-secret-change-in-production
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-in-development}
       NEXT_TELEMETRY_DISABLED: 1
     ports:
       - '3000:3000'

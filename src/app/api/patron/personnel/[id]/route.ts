@@ -3,6 +3,7 @@ import { hash as hashArgon2 } from 'argon2';
 import { z } from 'zod';
 import { prismaAdmin } from '@/lib/prisma';
 import { requirePermission } from '@/lib/authorization';
+import { hasLocationAssignmentTables } from '@/lib/location-assignments-compat';
 
 const patchSchema = z.object({
   email: z.email().optional(),
@@ -14,6 +15,15 @@ const patchSchema = z.object({
   roleCode: z.string().min(1).optional(),
   siteId: z.string().uuid().optional().nullable(),
   teamId: z.string().uuid().optional().nullable(),
+  locationAssignments: z
+    .array(
+      z.object({
+        siteId: z.string().uuid(),
+        locationId: z.string().uuid().optional().nullable(),
+      }),
+    )
+    .optional(),
+  managedSiteIds: z.array(z.string().uuid()).optional(),
 });
 
 function forbidden(message = 'Forbidden') {
@@ -22,6 +32,7 @@ function forbidden(message = 'Forbidden') {
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const actor = await requirePermission('USER:MANAGE');
+  const locationTablesReady = await hasLocationAssignmentTables();
   const { id } = await context.params;
 
   const targetUser = await prismaAdmin.user.findFirst({
@@ -39,14 +50,23 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   const payload = parsed.data;
+  const normalizedEmail = payload.email?.trim().toLowerCase();
+  const fallbackSiteIdFromLocationAssignments = payload.locationAssignments?.[0]?.siteId ?? null;
+  const fallbackManagedSiteId = payload.managedSiteIds?.[0] ?? null;
+  const effectiveSiteId =
+    payload.siteId !== undefined
+      ? payload.siteId
+      : locationTablesReady
+        ? undefined
+        : fallbackSiteIdFromLocationAssignments ?? fallbackManagedSiteId;
 
   if (payload.roleCode === 'SUPER_ADMIN' && !actor.roles.includes('SUPER_ADMIN')) {
     return forbidden('Only super admin can assign SUPER_ADMIN role');
   }
 
-  if (payload.email && payload.email !== targetUser.email) {
+  if (normalizedEmail && normalizedEmail !== targetUser.email) {
     const exists = await prismaAdmin.user.findFirst({
-      where: { tenantId: actor.tenantId, email: payload.email, NOT: { id } },
+      where: { tenantId: actor.tenantId, email: normalizedEmail, NOT: { id } },
       select: { id: true },
     });
     if (exists) {
@@ -54,14 +74,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
   }
 
-  if (payload.siteId) {
-    const site = await prismaAdmin.site.findFirst({ where: { id: payload.siteId, tenantId: actor.tenantId } });
+  if (effectiveSiteId) {
+    const site = await prismaAdmin.site.findFirst({ where: { id: effectiveSiteId, tenantId: actor.tenantId } });
     if (!site) return NextResponse.json({ error: 'Invalid siteId' }, { status: 400 });
   }
 
   if (payload.teamId) {
     const team = await prismaAdmin.team.findFirst({ where: { id: payload.teamId, tenantId: actor.tenantId } });
     if (!team) return NextResponse.json({ error: 'Invalid teamId' }, { status: 400 });
+    if (effectiveSiteId && team.siteId !== effectiveSiteId) {
+      return NextResponse.json({ error: 'teamId does not belong to siteId' }, { status: 400 });
+    }
+  }
+
+  if (payload.teamId && effectiveSiteId === null) {
+    return NextResponse.json({ error: 'siteId cannot be null when teamId is provided' }, { status: 400 });
   }
 
   let roleId: string | null = null;
@@ -79,8 +106,64 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const currentAssignment = await prismaAdmin.userRoleAssignment.findFirst({
     where: { tenantId: actor.tenantId, userId: id },
     orderBy: { createdAt: 'desc' },
-    select: { roleId: true },
+    include: { role: { select: { code: true } } },
   });
+
+  const nextRoleCode = payload.roleCode ?? currentAssignment?.role.code ?? null;
+  if ((payload.managedSiteIds?.length ?? 0) > 0 && nextRoleCode !== 'CHEF_EQUIPE') {
+    return NextResponse.json({ error: 'managedSiteIds is only allowed for CHEF_EQUIPE role' }, { status: 400 });
+  }
+
+  const normalizedLocationAssignments =
+    payload.locationAssignments !== undefined
+      ? payload.locationAssignments
+      : effectiveSiteId && locationTablesReady
+        ? [{ siteId: effectiveSiteId, locationId: null }]
+        : undefined;
+  const normalizedManagedSiteIds = payload.managedSiteIds ? [...new Set(payload.managedSiteIds)] : undefined;
+  const effectiveManagedSiteIds = locationTablesReady ? normalizedManagedSiteIds : undefined;
+
+  if (locationTablesReady && effectiveManagedSiteIds && effectiveManagedSiteIds.length > 0) {
+    const managedSites = await prismaAdmin.site.findMany({
+      where: { id: { in: effectiveManagedSiteIds }, tenantId: actor.tenantId },
+      select: { id: true },
+    });
+    if (managedSites.length !== effectiveManagedSiteIds.length) {
+      return NextResponse.json({ error: 'Invalid managedSiteIds' }, { status: 400 });
+    }
+  }
+
+  if (locationTablesReady && normalizedLocationAssignments && normalizedLocationAssignments.length > 0) {
+    const uniqueSiteIds = [...new Set(normalizedLocationAssignments.map((item) => item.siteId))];
+    const tenantSites = await prismaAdmin.site.findMany({
+      where: { tenantId: actor.tenantId, id: { in: uniqueSiteIds } },
+      select: { id: true },
+    });
+    if (tenantSites.length !== uniqueSiteIds.length) {
+      return NextResponse.json({ error: 'Invalid siteId in locationAssignments' }, { status: 400 });
+    }
+
+    const locationIds = normalizedLocationAssignments
+      .map((item) => item.locationId)
+      .filter((value): value is string => Boolean(value));
+    if (locationIds.length > 0) {
+      const locations = await prismaAdmin.location.findMany({
+        where: { tenantId: actor.tenantId, id: { in: locationIds } },
+        select: { id: true, siteId: true },
+      });
+      const locationById = new Map(locations.map((location) => [location.id, location]));
+      for (const assignment of normalizedLocationAssignments) {
+        if (!assignment.locationId) continue;
+        const location = locationById.get(assignment.locationId);
+        if (!location) {
+          return NextResponse.json({ error: 'Invalid locationId in locationAssignments' }, { status: 400 });
+        }
+        if (location.siteId !== assignment.siteId) {
+          return NextResponse.json({ error: 'locationId does not belong to siteId' }, { status: 400 });
+        }
+      }
+    }
+  }
 
   if ((payload.siteId !== undefined || payload.teamId !== undefined) && !roleId && !currentAssignment?.roleId) {
     return NextResponse.json({ error: 'No existing role assignment to preserve' }, { status: 400 });
@@ -90,20 +173,35 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   const updated = await prismaAdmin.$transaction(async (tx) => {
     const userUpdateData: Record<string, unknown> = {};
-    if (payload.email !== undefined) userUpdateData.email = payload.email;
+    if (normalizedEmail !== undefined) userUpdateData.email = normalizedEmail;
     if (payload.firstName !== undefined) userUpdateData.firstName = payload.firstName;
     if (payload.lastName !== undefined) userUpdateData.lastName = payload.lastName;
     if (payload.status !== undefined) userUpdateData.status = payload.status;
     if (payload.isActive !== undefined) userUpdateData.isActive = payload.isActive;
-    if (payload.siteId !== undefined) userUpdateData.siteId = payload.siteId;
+    const primarySiteFromAssignments =
+      normalizedLocationAssignments && normalizedLocationAssignments.length > 0
+        ? normalizedLocationAssignments[0]?.siteId ?? null
+        : undefined;
+
+    if (effectiveSiteId !== undefined) {
+      userUpdateData.siteId = effectiveSiteId;
+    } else if (primarySiteFromAssignments !== undefined) {
+      userUpdateData.siteId = primarySiteFromAssignments;
+    }
     if (payload.password) userUpdateData.passwordHash = await hashArgon2(payload.password);
 
     if (Object.keys(userUpdateData).length > 0) {
       await tx.user.update({ where: { id_tenantId: { id, tenantId: actor.tenantId } }, data: userUpdateData });
     }
 
-    if (roleId || payload.siteId !== undefined || payload.teamId !== undefined) {
+    if (roleId || payload.siteId !== undefined || payload.teamId !== undefined || normalizedLocationAssignments !== undefined) {
       const nextRoleId = roleId ?? currentAssignment?.roleId;
+      const scopedSiteId =
+        effectiveSiteId !== undefined
+          ? effectiveSiteId
+          : normalizedLocationAssignments && normalizedLocationAssignments.length === 1
+            ? normalizedLocationAssignments[0]?.siteId ?? null
+            : null;
 
       await tx.userRoleAssignment.deleteMany({ where: { tenantId: actor.tenantId, userId: id } });
       await tx.userRoleAssignment.create({
@@ -111,11 +209,48 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           tenantId: actor.tenantId,
           userId: id,
           roleId: nextRoleId!,
-          siteId: payload.siteId ?? null,
+          siteId: scopedSiteId,
           teamId: payload.teamId ?? null,
           validFrom: now,
         },
       });
+    }
+
+    if (locationTablesReady && normalizedLocationAssignments !== undefined) {
+      await tx.userLocationAssignment.updateMany({
+        where: { tenantId: actor.tenantId, userId: id, endedAt: null },
+        data: { endedAt: now },
+      });
+
+      if (normalizedLocationAssignments.length > 0) {
+        await tx.userLocationAssignment.createMany({
+          data: normalizedLocationAssignments.map((assignment) => ({
+            tenantId: actor.tenantId,
+            userId: id,
+            siteId: assignment.siteId,
+            locationId: assignment.locationId ?? null,
+            startedAt: now,
+          })),
+        });
+      }
+    }
+
+    if (locationTablesReady && effectiveManagedSiteIds !== undefined) {
+      await tx.siteManagerAssignment.updateMany({
+        where: { tenantId: actor.tenantId, userId: id, endedAt: null },
+        data: { endedAt: now },
+      });
+
+      if (effectiveManagedSiteIds.length > 0) {
+        await tx.siteManagerAssignment.createMany({
+          data: effectiveManagedSiteIds.map((managedSiteId) => ({
+            tenantId: actor.tenantId,
+            userId: id,
+            siteId: managedSiteId,
+            startedAt: now,
+          })),
+        });
+      }
     }
 
     if (payload.teamId !== undefined) {

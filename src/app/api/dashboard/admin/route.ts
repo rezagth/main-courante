@@ -8,7 +8,7 @@ export async function GET() {
 
   const payload = await cachedJson('analytics:admin:global:30d', async () => {
     const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const [tenants, activeUsers, entriesByTenant, featureFlags, quotaRows] = await Promise.all([
+    const [tenants, activeUsers, entriesByTenant, storageByTenant, featureFlags, quotaRows] = await Promise.all([
       prismaAdmin.tenant.findMany({
         orderBy: { updatedAt: 'desc' },
         select: {
@@ -30,6 +30,12 @@ export async function GET() {
         where: { deletedAt: null, timestamp: { gte: from } },
         _count: { _all: true },
       }),
+      prismaAdmin.$queryRaw<Array<{ tenant_id: string; total_bytes: bigint | number | null }>>`
+        SELECT tenant_id, COALESCE(SUM(photo_size_bytes), 0) AS total_bytes
+        FROM "entrees_main_courante"
+        WHERE deleted_at IS NULL
+        GROUP BY tenant_id
+      `,
       prismaAdmin.tenantFeatureFlag.findMany({
         select: { tenantId: true, key: true, enabled: true },
       }),
@@ -38,6 +44,7 @@ export async function GET() {
 
     const usersMap = Object.fromEntries(activeUsers.map((x) => [x.tenantId, x._count._all]));
     const entriesMap = Object.fromEntries(entriesByTenant.map((x) => [x.tenantId, x._count._all]));
+    const storageMap = Object.fromEntries(storageByTenant.map((x) => [x.tenant_id, Number(x.total_bytes ?? 0)]));
     const quotaMap = Object.fromEntries(quotaRows.map((q) => [q.tenantId, q]));
     const flagsMap = featureFlags.reduce<Record<string, Array<{ key: string; enabled: boolean }>>>(
       (acc, item) => {
@@ -53,7 +60,7 @@ export async function GET() {
       tenantName: tenant.name,
       activeUsers: usersMap[tenant.id] ?? 0,
       entriesLast30Days: entriesMap[tenant.id] ?? 0,
-      storageS3Mb: (entriesMap[tenant.id] ?? 0) * 1.2,
+      storageMb: (storageMap[tenant.id] ?? 0) / (1024 * 1024),
     }));
 
     return {

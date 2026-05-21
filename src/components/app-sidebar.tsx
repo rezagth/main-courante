@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { LayoutDashboardIcon, ShieldCheckIcon, UsersIcon, Building2Icon, ActivityIcon, TerminalIcon, SquarePenIcon } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -75,7 +76,7 @@ const NAV_MAIN = [
         url: "/onboarding",
       },
       {
-        title: "Tenants",
+        title: "Hôpitaux",
         url: "/admin/analytics/tenants",
       },
       {
@@ -95,16 +96,20 @@ const NAV_MAIN = [
     allowedRoles: ["PATRON", "SUPER_ADMIN"],
     items: [
       {
-        title: "Dashboard patron",
-        url: "/patron/dashboard",
+        title: "Pilotage",
+        url: "/patron",
       },
       {
-        title: "Personnel",
+        title: "Sites",
+        url: "/patron/hopitaux",
+      },
+      {
+        title: "Agents",
         url: "/patron/personnel",
       },
       {
-        title: "Créer un tenant",
-        url: "/patron/onboarding",
+        title: "Entrées",
+        url: "/patron/entrees",
       },
     ],
   },
@@ -202,67 +207,110 @@ const NAV_SECONDARY = [
 ]
 
 export function AppSidebar({ userName, userEmail, roles, ...props }: AppSidebarProps) {
+  const pathname = usePathname()
+  const currentPath = pathname ?? ''
   const safeRoles = roles ?? []
   const isSuperAdmin = safeRoles.includes('SUPER_ADMIN')
+  const isPatronUser = safeRoles.includes('PATRON')
+  const isPatronOnly = safeRoles.includes('PATRON') && safeRoles.length === 1
+  const isPatronRoute = currentPath === '/patron' || currentPath.startsWith('/patron/') || currentPath.includes('/patron')
+  const isPatronNavigationOnly = !isSuperAdmin && isPatronRoute
 
   const normalizeUrl = (url: string) => {
     if (!isSuperAdmin) return url
-    if (url === '/patron/dashboard') return '/patron'
     if (url === '/agent/dashboard') return '/agent'
     if (url === '/chef/dashboard') return '/chef'
     if (url === '/client/dashboard') return '/client'
     return url
   }
 
-  const navMain = NAV_MAIN.filter((item) => hasAccess(safeRoles, [...item.allowedRoles])).map((item) => ({
-    title: item.title,
-    url: normalizeUrl(item.url),
-    icon: item.icon,
-    isActive: false,
-    items: item.items.map((subItem) => ({
-      title: subItem.title,
-      url: normalizeUrl(subItem.url),
-    })),
-  }))
+  const patronSimpleNav = [
+    {
+      title: "Pilotage",
+      url: "/patron",
+      icon: <LayoutDashboardIcon />,
+      isActive: false,
+      items: [],
+    },
+    {
+      title: "Sites",
+      url: "/patron/hopitaux",
+      icon: <Building2Icon />,
+      isActive: false,
+      items: [],
+    },
+    {
+      title: "Agents",
+      url: "/patron/personnel",
+      icon: <UsersIcon />,
+      isActive: false,
+      items: [],
+    },
+    {
+      title: "Entrées",
+      url: "/patron/entrees",
+      icon: <SquarePenIcon />,
+      isActive: false,
+      items: [],
+    },
+  ]
 
-  const navSecondary = NAV_SECONDARY.filter((item) => hasAccess(safeRoles, [...item.allowedRoles])).map((item) => ({
+  const navMain = isPatronNavigationOnly
+    ? patronSimpleNav
+    : NAV_MAIN.filter((item) => hasAccess(safeRoles, [...item.allowedRoles])).map((item) => ({
+        title: item.title,
+        url: normalizeUrl(item.url),
+        icon: item.icon,
+        isActive: false,
+        items: item.items.map((subItem) => ({
+          title: subItem.title,
+          url: normalizeUrl(subItem.url),
+        })),
+      }))
+
+  const navSecondary = (isPatronNavigationOnly ? [] : NAV_SECONDARY).filter((item) => hasAccess(safeRoles, [...item.allowedRoles])).map((item) => ({
     title: item.title,
     url: item.url,
     icon: item.icon,
   }))
 
-  const visibleRoleLabels = safeRoles.filter((role) => ALL_APP_ROLES.includes(role)).map(roleLabel)
+  const visibleRoleLabels = isPatronNavigationOnly
+    ? ['Patron']
+    : safeRoles.filter((role) => ALL_APP_ROLES.includes(role)).map(roleLabel)
 
   return (
     <Sidebar
       variant="inset"
       collapsible="icon"
-      className="sidebar-font border-r border-white/10 bg-[#151515] text-zinc-100"
+      className="sidebar-font border-r border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.18),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.14),transparent_45%),linear-gradient(180deg,#0e1011_0%,#0a0c0d_100%)] text-zinc-100"
       {...props}
     >
       <SidebarHeader className="gap-3 px-3 pt-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild className="hover:bg-transparent hover:text-inherit">
+            <SidebarMenuButton size="lg" asChild className="h-auto rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.35)] hover:bg-white/[0.08] hover:text-inherit">
               <Link href="/" className="gap-3">
-                <div className="flex aspect-square size-9 items-center justify-center rounded-xl bg-[#2f67f6] text-white shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
+                <div className="flex aspect-square size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)]">
                   <TerminalIcon className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight font-mono">
                   <span className="truncate font-semibold tracking-[-0.02em] text-zinc-100">Main Courante</span>
-                  <span className="truncate text-xs text-zinc-400">Sécurité incendie</span>
+                  <span className="truncate text-xs text-zinc-400">Pilotage sécurité incendie</span>
                 </div>
+                <span className="rounded-full border border-emerald-300/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-emerald-100">
+                  {isPatronNavigationOnly || isPatronOnly ? 'Patron' : 'Console'}
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarSeparator className="mx-3 my-2 bg-white/10" />
+      <SidebarSeparator className="mx-3 my-2 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
       <SidebarContent>
         <NavMain items={navMain} />
-        <NavSecondary items={navSecondary} className="mt-auto px-1 pb-1" />
+        {navSecondary.length ? <NavSecondary items={navSecondary} className="mt-auto px-1 pb-1" /> : null}
       </SidebarContent>
-      <SidebarSeparator className="mx-3 my-2 bg-white/10" />
+      <SidebarSeparator className="mx-3 my-2 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
       <SidebarFooter>
         <NavUser
           user={{

@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { HeadBucketCommand } from '@aws-sdk/client-s3';
 import { prismaAdmin } from '@/lib/prisma';
-import { s3 } from '@/lib/s3';
 import { logger } from '@/lib/logger';
 import { readApiHealth } from '@/lib/observability';
 
@@ -11,7 +9,7 @@ export async function GET() {
   const checks = {
     uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
     db: false,
-    s3: false,
+    storage: false,
   };
 
   try {
@@ -22,20 +20,21 @@ export async function GET() {
   }
 
   try {
-    const bucket = process.env.S3_BUCKET_NAME;
-    if (bucket) {
-      await s3.send(new HeadBucketCommand({ Bucket: bucket }));
-      checks.s3 = true;
-    }
+    await prismaAdmin.$queryRaw`
+      SELECT COALESCE(SUM(photo_size_bytes), 0)
+      FROM "entrees_main_courante"
+      WHERE deleted_at IS NULL
+    `;
+    checks.storage = true;
   } catch (error) {
-    logger.error('status_s3_failed', { error: String(error) });
+    logger.error('status_storage_failed', { error: String(error) });
   }
 
   return NextResponse.json({
     alerts: {
       ...(await readApiHealth('v1_entries')),
     },
-    status: checks.db && checks.s3 ? 'ok' : 'degraded',
+    status: checks.db && checks.storage ? 'ok' : 'degraded',
     ...checks,
   });
 }

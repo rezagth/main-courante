@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { hasDynamicPermission, assertResourceBelongsToTenant } from '@/lib/rbac-db';
 import { logAuditEvent } from '@/lib/audit';
+import { prismaAdmin } from '@/lib/prisma';
 
 export async function requirePermission(permission: string, context?: { siteId?: string; teamId?: string }) {
   const session = await auth();
@@ -60,4 +61,68 @@ export async function requireAnyRole(roles: string[]) {
     throw new Error('Forbidden');
   }
   return session.user;
+}
+
+export async function getManagedSiteIdsForUser(tenantId: string, userId: string): Promise<string[]> {
+  const now = new Date();
+  const assignments = await prismaAdmin.siteManagerAssignment.findMany({
+    where: {
+      tenantId,
+      userId,
+      startedAt: { lte: now },
+      OR: [{ endedAt: null }, { endedAt: { gte: now } }],
+    },
+    select: { siteId: true },
+  });
+  return assignments.map((item) => item.siteId);
+}
+
+export async function assertChefCanManageAgent(
+  tenantId: string,
+  chefUserId: string,
+  targetUserId: string,
+): Promise<void> {
+  const managedSiteIds = await getManagedSiteIdsForUser(tenantId, chefUserId);
+  if (managedSiteIds.length === 0) {
+    throw new Error('Forbidden: no managed site scope');
+  }
+
+  const now = new Date();
+  const assignment = await prismaAdmin.userLocationAssignment.findFirst({
+    where: {
+      tenantId,
+      userId: targetUserId,
+      siteId: { in: managedSiteIds },
+      startedAt: { lte: now },
+      OR: [{ endedAt: null }, { endedAt: { gte: now } }],
+    },
+    select: { id: true },
+  });
+
+  if (!assignment) {
+    throw new Error('Forbidden: target user is outside your managed scope');
+  }
+}
+
+const GLOBAL_ENTRY_VIEW_ROLES = new Set(['PATRON', 'SUPER_ADMIN', 'CLIENT']);
+
+export type EntryReadScope =
+  | { kind: 'tenant' }
+  | { kind: 'managed-sites'; siteIds: string[] }
+  | { kind: 'own'; userId: string };
+
+export function resolveEntryReadScope(
+  roles: string[],
+  userId: string,
+  managedSiteIds: string[],
+): EntryReadScope {
+  if (roles.some((role) => GLOBAL_ENTRY_VIEW_ROLES.has(role))) {
+    return { kind: 'tenant' };
+  }
+
+  if (roles.includes('CHEF_EQUIPE')) {
+    return { kind: 'managed-sites', siteIds: managedSiteIds };
+  }
+
+  return { kind: 'own', userId };
 }

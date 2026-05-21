@@ -46,9 +46,9 @@ export function TenantOnboardingForm() {
     <main className="mx-auto w-full max-w-6xl space-y-4 p-4">
       <section className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.16),transparent_45%),#111111] p-5 md:p-6">
         <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Admin · Onboarding</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-100">Création d’un tenant</h1>
+        <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-100">Création d’un hôpital client</h1>
         <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-          Crée un tenant complet avec quotas, checklist, types d’événements et invitation admin initiale.
+          Crée un hôpital client complet avec quotas, checklist, types d’événements et invitation admin initiale.
         </p>
       </section>
 
@@ -56,7 +56,7 @@ export function TenantOnboardingForm() {
         <Card className="border-white/10 bg-[#111111] p-5">
           <form className="space-y-3" onSubmit={onSubmit}>
             <div className="grid gap-3 md:grid-cols-2">
-              <Input className="border-white/10 bg-[#0f0f0f] text-zinc-100" placeholder="Nom tenant" {...register('name', { required: true })} />
+              <Input className="border-white/10 bg-[#0f0f0f] text-zinc-100" placeholder="Nom hôpital client" {...register('name', { required: true })} />
               <Input className="border-white/10 bg-[#0f0f0f] text-zinc-100" placeholder="Domaine" {...register('domain', { required: true })} />
             </div>
             <Input className="border-white/10 bg-[#0f0f0f] text-zinc-100" placeholder="Admin email" type="email" {...register('adminEmail', { required: true })} />
@@ -73,7 +73,7 @@ export function TenantOnboardingForm() {
             />
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button className="bg-orange-500 text-white hover:bg-orange-400" disabled={formState.isSubmitting} type="submit">
-                {formState.isSubmitting ? 'Création...' : 'Créer le tenant'}
+                {formState.isSubmitting ? 'Création...' : 'Créer l’hôpital client'}
               </Button>
             </div>
           </form>
@@ -94,7 +94,7 @@ export function TenantOnboardingForm() {
           <Card className="border-white/10 bg-[#111111] p-4">
             <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">Conseil</p>
             <p className="mt-2 text-sm text-zinc-400">
-              Utilise un domaine cohérent avec le nom du client pour garder les codes tenant lisibles.
+              Utilise un domaine cohérent avec le nom du client pour garder les codes hôpital lisibles.
             </p>
           </Card>
         </div>
@@ -102,7 +102,7 @@ export function TenantOnboardingForm() {
 
       {result ? (
         <Card className="border-emerald-400/20 bg-emerald-500/10 p-5 text-emerald-100">
-          <p className="font-medium">Tenant créé: {result.tenantId}</p>
+          <p className="font-medium">Hôpital client créé: {result.tenantId}</p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-emerald-100/80">
             <li>Créer un site</li>
             <li>Créer une équipe</li>

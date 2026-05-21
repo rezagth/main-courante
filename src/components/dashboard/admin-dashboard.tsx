@@ -29,7 +29,7 @@ type AdminPayload = {
     tenantName: string;
     activeUsers: number;
     entriesLast30Days: number;
-    storageS3Mb: number;
+    storageMb: number;
   }>;
 };
 
@@ -604,7 +604,7 @@ export function AdminDashboard() {
                               label: 'Stockage (Go)',
                               field: 'maxStorageGb' as const,
                               default: tenant.quota?.maxStorageGb ?? 20,
-                              current: quotaData ? Math.round(quotaData.storageS3Mb / 1024) : 0,
+                              current: quotaData ? Math.round(quotaData.storageMb / 1024) : 0,
                               icon: '💾',
                               color: '#10b981',
                             },

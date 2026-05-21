@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { AppSidebar as SidebarNavigation } from '@/components/app-sidebar'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { resolveDefaultDashboardPath } from '@/lib/role-routing'
 import {
   Breadcrumb,
@@ -23,6 +24,10 @@ type SidebarProps = {
 }
 
 export function AppSidebar({ userName, userEmail, roles, children }: SidebarProps) {
+  const pathname = usePathname()
+  const currentPath = pathname ?? ''
+  const isPatronRoute = currentPath === '/patron' || currentPath.startsWith('/patron/') || currentPath.includes('/patron')
+
   const sectionTitle = roles.includes('SUPER_ADMIN')
     ? 'Administration'
     : roles.includes('PATRON')
@@ -32,6 +37,9 @@ export function AppSidebar({ userName, userEmail, roles, children }: SidebarProp
       : roles.includes('CHEF_EQUIPE')
         ? "Chef d’équipe"
         : 'Client'
+
+  const currentSectionTitle = isPatronRoute ? 'Patron' : sectionTitle
+  const dashboardHref = isPatronRoute ? '/patron' : resolveDefaultDashboardPath(roles)
 
   return (
     <SidebarProvider>
@@ -44,12 +52,12 @@ export function AppSidebar({ userName, userEmail, roles, children }: SidebarProp
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
                 <BreadcrumbLink asChild className="text-zinc-400 hover:text-zinc-100">
-                  <Link href={resolveDefaultDashboardPath(roles)}>Tableau de bord</Link>
+                  <Link href={dashboardHref}>Tableau de bord</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem className="text-zinc-100">
-                <BreadcrumbPage>{sectionTitle}</BreadcrumbPage>
+                <BreadcrumbPage>{currentSectionTitle}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>

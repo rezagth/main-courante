@@ -92,7 +92,14 @@ describe('RBAC - Role-Based Access Control', () => {
   describe('Role Permission Association', () => {
     it('should allow assigning permissions to roles', async () => {
       const role = testContext.roles.PATRON;
-      const permission = testContext.permissions['USER:MANAGE'];
+      const permission = await prisma.permission.create({
+        data: {
+          tenantId: testContext.tenant.id,
+          resource: 'CUSTOM',
+          action: 'MANAGE',
+          code: `CUSTOM:MANAGE:${Date.now()}`,
+        },
+      });
 
       const rolePermission = await prisma.rolePermission.create({
         data: {
@@ -108,7 +115,14 @@ describe('RBAC - Role-Based Access Control', () => {
 
     it('should allow denying permissions to roles', async () => {
       const role = testContext.roles.AGENT;
-      const permission = testContext.permissions['USER:MANAGE'];
+      const permission = await prisma.permission.create({
+        data: {
+          tenantId: testContext.tenant.id,
+          resource: 'CUSTOM',
+          action: 'DENY',
+          code: `CUSTOM:DENY:${Date.now()}`,
+        },
+      });
 
       const rolePermission = await prisma.rolePermission.create({
         data: {

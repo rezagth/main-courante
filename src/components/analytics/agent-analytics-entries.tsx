@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { AnalyticsShell, NavChip, Panel } from './analytics-shell';
 
@@ -46,6 +47,7 @@ export function AgentAnalyticsEntries() {
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3">Localisation</th>
                 <th className="px-4 py-3">Gravité</th>
+                <th className="px-4 py-3">Ouvrir</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -56,6 +58,11 @@ export function AgentAnalyticsEntries() {
                   <td className="px-4 py-3">{entry.description}</td>
                   <td className="px-4 py-3">{entry.localisation ?? '—'}</td>
                   <td className="px-4 py-3 text-orange-300">{entry.gravite ?? 'N/C'}</td>
+                  <td className="px-4 py-3">
+                    <Link className="text-xs text-orange-300 hover:text-orange-200" href={`/entries/${entry.id}`}>
+                      Voir
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

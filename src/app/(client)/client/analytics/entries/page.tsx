@@ -3,6 +3,7 @@ import { fetchServerJson } from '@/lib/server-json';
 import { auth } from '@/lib/auth';
 import { hasAnyRole, resolveDefaultDashboardPath } from '@/lib/role-routing';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 
 type EntryPayload = {
   data: Array<{
@@ -47,6 +48,7 @@ export default async function ClientAnalyticsEntriesPage() {
                 <th className="px-4 py-3">Site</th>
                 <th className="px-4 py-3">Agent</th>
                 <th className="px-4 py-3">Gravité</th>
+                <th className="px-4 py-3">Ouvrir</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -58,6 +60,11 @@ export default async function ClientAnalyticsEntriesPage() {
                   <td className="px-4 py-3">{row.site?.name ?? 'N/C'}</td>
                   <td className="px-4 py-3">{[row.user?.firstName, row.user?.lastName].filter(Boolean).join(' ') || 'N/C'}</td>
                   <td className="px-4 py-3 text-orange-400">{row.gravite ?? 'N/C'}</td>
+                  <td className="px-4 py-3">
+                    <Link className="text-xs text-orange-300 hover:text-orange-200" href={`/entries/${row.id}`}>
+                      Voir
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

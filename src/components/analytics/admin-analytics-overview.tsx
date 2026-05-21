@@ -17,7 +17,7 @@ type AdminPayload = {
     featureFlags: Array<{ key: string; enabled: boolean }>;
     quota: { maxActiveUsers: number; maxEntriesPerMonth: number; maxStorageGb: number } | null;
   }>;
-  quotas: Array<{ tenantId: string; tenantName: string; activeUsers: number; entriesLast30Days: number; storageS3Mb: number }>;
+  quotas: Array<{ tenantId: string; tenantName: string; activeUsers: number; entriesLast30Days: number; storageMb: number }>;
 };
 
 export function AdminAnalyticsOverview() {

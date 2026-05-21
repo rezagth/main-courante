@@ -40,6 +40,7 @@ model Tenant {
 
   sites           Site[]
   teams           Team[]
+  locations       Location[]
   users           User[]
   eventTypes      TypeEvenement[]
   entries         EntreeMainCourante[]
@@ -48,6 +49,8 @@ model Tenant {
   rolePermissions RolePermission[]
   roleAssignments UserRoleAssignment[]
   teamMembers     TeamMember[]
+  locationAssignments UserLocationAssignment[]
+  siteManagers    SiteManagerAssignment[]
   auditLogs       AuditLog[]
   ssoProviders    TenantSsoProvider[]
   featureFlags    TenantFeatureFlag[]
@@ -195,9 +198,12 @@ model Site {
 
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   teams       Team[]
+  locations   Location[]
   users       User[]
   entries     EntreeMainCourante[]
   assignments UserRoleAssignment[]
+  locationAssignments UserLocationAssignment[]
+  managerAssignments SiteManagerAssignment[]
 
   @@unique([tenantId, code])
   @@unique([id, tenantId])
@@ -244,6 +250,8 @@ model User {
   tenant              Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   site                Site?                  @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict)
   teamMembership      TeamMember[]
+  managedSites        SiteManagerAssignment[]
+  locationAssignments UserLocationAssignment[]
   entries             EntreeMainCourante[]
   assignments         UserRoleAssignment[]
   auditLogs           AuditLog[]             @relation("AuditActor")
@@ -355,6 +363,66 @@ model TeamMember {
   @@map("team_members")
 }
 
+model Location {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  siteId    String   @map("site_id")
+  code      String
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  site        Site     @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  assignments UserLocationAssignment[]
+
+  @@unique([tenantId, siteId, code])
+  @@unique([id, tenantId])
+  @@index([tenantId, siteId, name])
+  @@map("locations")
+}
+
+model UserLocationAssignment {
+  id         String    @id @default(uuid())
+  tenantId   String    @map("tenant_id")
+  userId     String    @map("user_id")
+  siteId     String    @map("site_id")
+  locationId String?   @map("location_id")
+  startedAt  DateTime  @default(now()) @map("started_at")
+  endedAt    DateTime? @map("ended_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user     User      @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  site     Site      @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  location Location? @relation(fields: [locationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([tenantId, userId, siteId, locationId, startedAt])
+  @@index([tenantId, userId, endedAt])
+  @@index([tenantId, siteId, locationId, endedAt])
+  @@map("user_location_assignments")
+}
+
+model SiteManagerAssignment {
+  id        String    @id @default(uuid())
+  tenantId  String    @map("tenant_id")
+  userId    String    @map("user_id")
+  siteId    String    @map("site_id")
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  site   Site   @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([tenantId, userId, siteId, startedAt])
+  @@index([tenantId, userId, endedAt])
+  @@index([tenantId, siteId, endedAt])
+  @@map("site_manager_assignments")
+}
+
 model TypeEvenement {
   id             String   @id @default(uuid())
   tenantId       String   @map("tenant_id")
@@ -385,6 +453,9 @@ model EntreeMainCourante {
   description     String
   localisation    String?
   photoUrl        String?    @map("photo_url")
+  photoData       Bytes?     @map("photo_data")
+  photoMimeType   String?    @map("photo_mime_type")
+  photoSizeBytes  Int?       @map("photo_size_bytes")
   gravite         Gravite?
   syncStatus      SyncStatus @default(PENDING) @map("sync_status")
   deletedAt       DateTime?  @map("deleted_at")

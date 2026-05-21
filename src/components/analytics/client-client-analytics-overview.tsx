@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { AnalyticsShell, MetricCard, MetricsGrid, NavChip, Panel } from './analytics-shell';
 
@@ -102,13 +103,13 @@ export function ClientAnalyticsOverview() {
         <Panel title="Derniers événements">
           <div className="space-y-2">
             {(data?.rows ?? []).map((entry) => (
-              <article key={entry.id} className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+              <Link key={entry.id} href={`/entries/${entry.id}`} className="block rounded-xl border border-white/5 bg-white/[0.02] p-3 transition hover:border-white/20 hover:bg-white/[0.05]">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-medium text-zinc-100">{entry.description}</p>
                   <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-zinc-400">{entry.gravite ?? 'N/C'}</span>
                 </div>
                 <p className="mt-1 text-sm text-zinc-400">{entry.typeEvenement.label} · {entry.site.name} · {entry.user.firstName} {entry.user.lastName}</p>
-              </article>
+              </Link>
             ))}
           </div>
         </Panel>

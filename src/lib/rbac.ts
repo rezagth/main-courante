@@ -19,7 +19,9 @@ export type PermissionCode =
   | 'USER:MANAGE'
   | 'TENANT:CREATE'
   | 'SITE:MANAGE'
-  | 'ROLE:MANAGE';
+  | 'ROLE:MANAGE'
+  | 'LOCATION:MANAGE'
+  | 'AGENT_ASSIGNMENT:MANAGE';
 
 export type RoleAssignmentScope = {
   tenantId: string;
@@ -51,6 +53,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     'ENTRY:EXPORT',
     'TYPE_EVENT:MANAGE',
     'USER:READ',
+    'AGENT_ASSIGNMENT:MANAGE',
   ],
   CLIENT: ['ENTRY:READ'],
   PATRON: [
@@ -65,6 +68,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     'TENANT:CREATE',
     'SITE:MANAGE',
     'ROLE:MANAGE',
+    'LOCATION:MANAGE',
+    'AGENT_ASSIGNMENT:MANAGE',
   ],
   SUPER_ADMIN: [
     'ENTRY:CREATE',
@@ -78,6 +83,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     'TENANT:CREATE',
     'SITE:MANAGE',
     'ROLE:MANAGE',
+    'LOCATION:MANAGE',
+    'AGENT_ASSIGNMENT:MANAGE',
   ],
 };
 

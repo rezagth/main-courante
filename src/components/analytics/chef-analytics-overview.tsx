@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { AnalyticsShell, MetricCard, MetricsGrid, NavChip, Panel } from './analytics-shell';
 
@@ -117,13 +118,13 @@ export function ChefAnalyticsOverview() {
       <Panel title="Dernières entrées">
         <div className="space-y-2">
           {(data?.recent ?? []).map((entry) => (
-            <article key={entry.id} className="rounded-xl border border-white/5 bg-white/[0.02] p-3 text-sm text-zinc-300">
+            <Link key={entry.id} href={`/entries/${entry.id}`} className="block rounded-xl border border-white/5 bg-white/[0.02] p-3 text-sm text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.05]">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium text-zinc-100">{entry.description}</p>
                 <span className="text-zinc-500">{new Date(entry.timestamp).toLocaleTimeString()}</span>
               </div>
               <p className="mt-1 text-zinc-400">{entry.user.firstName} {entry.user.lastName}</p>
-            </article>
+            </Link>
           ))}
         </div>
       </Panel>

@@ -8,7 +8,7 @@ async function getStatus() {
     status: string;
     uptimeSeconds: number;
     db: boolean;
-    s3: boolean;
+    storage: boolean;
     alerts?: { errorRate: number; p95: number; alert: boolean };
   };
 }
@@ -22,7 +22,7 @@ export default async function StatusPage() {
         <p>Etat global: {data?.status ?? 'unknown'}</p>
         <p>Uptime API: {data?.uptimeSeconds ?? 0}s</p>
         <p>Base de donnees: {data?.db ? 'OK' : 'KO'}</p>
-        <p>S3: {data?.s3 ? 'OK' : 'KO'}</p>
+        <p>Stockage photo: {data?.storage ? 'OK' : 'KO'}</p>
         <p>Erreur rate: {((data?.alerts?.errorRate ?? 0) * 100).toFixed(2)}%</p>
         <p>Latence P95: {Math.round(data?.alerts?.p95 ?? 0)} ms</p>
         <p>Alerte: {data?.alerts?.alert ? 'ACTIVE' : 'OK'}</p>

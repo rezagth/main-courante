@@ -18,7 +18,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
-import { ChevronRightIcon } from "lucide-react"
+import { ChevronRightIcon, LayoutDashboardIcon, Building2Icon, UsersIcon, SquarePenIcon } from "lucide-react"
 
 export type NavMainItem = {
   title: string
@@ -37,21 +37,34 @@ export function NavMain({
   items: NavMainItem[]
 }) {
   const pathname = usePathname()
+  const currentPath = pathname ?? ''
+  const isPatronFocused = currentPath === '/patron' || currentPath.startsWith('/patron/') || currentPath.includes('/patron')
+
+  const simplePatronItems: NavMainItem[] = [
+    { title: 'Pilotage', url: '/patron', icon: <LayoutDashboardIcon />, items: [] },
+    { title: 'Hopitaux', url: '/patron/hopitaux', icon: <Building2Icon />, items: [] },
+    { title: 'Agents', url: '/patron/personnel', icon: <UsersIcon />, items: [] },
+    { title: 'Entrées', url: '/patron/entrees', icon: <SquarePenIcon />, items: [] },
+  ]
+
+  const displayedItems = isPatronFocused
+    ? simplePatronItems
+    : items
 
   return (
     <SidebarGroup className="px-2 py-1.5">
       <SidebarGroupLabel className="px-2 text-[10px] uppercase tracking-[0.22em] text-zinc-500 font-sans">
-        Plate-forme
+        {isPatronFocused ? "Pilotage patron" : "Plate-forme"}
       </SidebarGroupLabel>
       <SidebarMenu className="gap-1">
-        {items.map((item) => (
+        {displayedItems.map((item) => (
           <Collapsible key={item.title} asChild defaultOpen={item.isActive ?? pathname.startsWith(item.url)}>
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
                 tooltip={item.title}
                 isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
-                className="rounded-xl text-zinc-200 hover:bg-white/5 hover:text-white data-active:bg-white/10 data-active:text-white font-sans"
+                className="rounded-xl border border-transparent text-zinc-200 hover:border-white/10 hover:bg-white/5 hover:text-white data-active:border-emerald-300/30 data-active:bg-gradient-to-r data-active:from-emerald-500/20 data-active:to-cyan-500/15 data-active:text-white font-sans"
               >
                 <Link href={item.url}>
                   {item.icon}
@@ -73,7 +86,7 @@ export function NavMain({
                           <SidebarMenuSubButton
                             asChild
                             isActive={pathname === subItem.url || pathname.startsWith(`${subItem.url}/`)}
-                            className="rounded-lg text-zinc-400 hover:bg-white/5 hover:text-zinc-100 data-active:bg-white/10 data-active:text-white font-sans"
+                            className="rounded-lg text-zinc-400 hover:bg-white/5 hover:text-zinc-100 data-active:bg-emerald-500/15 data-active:text-white font-sans"
                           >
                             <Link href={subItem.url}>
                               <span>{subItem.title}</span>

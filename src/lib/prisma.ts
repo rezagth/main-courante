@@ -10,8 +10,11 @@ const globalForPg = globalThis as unknown as { pgPool?: Pool };
 const TENANT_MODELS = new Set([
   'Site',
   'Team',
+  'Location',
   'User',
   'TeamMember',
+  'UserLocationAssignment',
+  'SiteManagerAssignment',
   'TypeEvenement',
   'EntreeMainCourante',
   'Role',

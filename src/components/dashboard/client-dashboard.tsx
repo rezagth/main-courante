@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Bar, BarChart, CartesianGrid, Line, LineChart,
@@ -280,6 +281,15 @@ export function ClientDashboard() {
     col.accessor('site.name', { header: 'Site' }),
     col.accessor(row => `${row.user.firstName} ${row.user.lastName}`.trim(), { id: 'agent', header: 'Agent' }),
     col.accessor('gravite', { header: 'Gravité', cell: info => <GravitePill value={info.getValue()} /> }),
+    col.display({
+      id: 'detail',
+      header: 'Ouvrir',
+      cell: info => (
+        <Link className="text-xs text-orange-300 hover:text-orange-200" href={`/entries/${info.row.original.id}`}>
+          Voir
+        </Link>
+      ),
+    }),
   ], []);
 
   const table = useReactTable({ data: data?.rows ?? [], columns, getCoreRowModel: getCoreRowModel() });

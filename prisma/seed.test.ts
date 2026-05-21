@@ -97,6 +97,8 @@ export async function seedTestDatabase() {
     { resource: 'TENANT', action: 'CREATE', code: 'TENANT:CREATE' },
     { resource: 'SITE', action: 'MANAGE', code: 'SITE:MANAGE' },
     { resource: 'ROLE', action: 'MANAGE', code: 'ROLE:MANAGE' },
+    { resource: 'LOCATION', action: 'MANAGE', code: 'LOCATION:MANAGE' },
+    { resource: 'AGENT_ASSIGNMENT', action: 'MANAGE', code: 'AGENT_ASSIGNMENT:MANAGE' },
   ];
 
   const permissions: any = {};
@@ -134,6 +136,8 @@ export async function seedTestDatabase() {
             'TENANT:CREATE',
             'SITE:MANAGE',
             'ROLE:MANAGE',
+            'LOCATION:MANAGE',
+            'AGENT_ASSIGNMENT:MANAGE',
           ].includes(item.code)) ||
         (roleCode === 'CHEF_EQUIPE' &&
           [
@@ -143,6 +147,7 @@ export async function seedTestDatabase() {
             'ENTRY:EXPORT',
             'TYPE_EVENT:MANAGE',
             'USER:READ',
+            'AGENT_ASSIGNMENT:MANAGE',
           ].includes(item.code)) ||
         (roleCode === 'AGENT' && ['ENTRY:CREATE', 'ENTRY:READ', 'ENTRY:UPDATE'].includes(item.code)) ||
         (roleCode === 'CLIENT' && ['ENTRY:READ'].includes(item.code));

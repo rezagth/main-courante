@@ -3,7 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { verify as verifyArgon2 } from 'argon2';
 import { randomUUID } from 'node:crypto';
 import { prismaAdmin } from '@/lib/prisma';
-import { redis } from '@/lib/redis';
+import { getRedisClient } from '@/lib/redis';
 import { logAuditEvent } from '@/lib/audit';
 import { assertLoginRateLimit, extractIp } from '@/lib/security';
 
@@ -11,6 +11,7 @@ const SESSION_TTL_SECONDS = 60 * 60 * 12;
 const JWT_ROTATION_SECONDS = 60 * 15;
 
 async function storeServerSession(jti: string, payload: Record<string, unknown>) {
+  const redis = getRedisClient();
   if (!redis) return;
   await redis.set(`session:${jti}`, JSON.stringify(payload), 'EX', SESSION_TTL_SECONDS);
 }
@@ -36,20 +37,39 @@ export const authOptions: NextAuthOptions = {
 
         await assertLoginRateLimit(ip);
 
-        if (!email || !password) {
+        const normalizedEmail = email?.trim().toLowerCase();
+
+        if (!normalizedEmail || !password) {
           return null;
         }
 
-        const user = await prismaAdmin.user.findFirst({
-          where: { email, isActive: true },
-          include: {
-            assignments: {
-              include: {
-                role: true,
+        const user =
+          (await prismaAdmin.user.findFirst({
+            where: { email: normalizedEmail, isActive: true },
+            include: {
+              assignments: {
+                include: {
+                  role: true,
+                },
               },
             },
-          },
-        });
+          })) ??
+          (await prismaAdmin.user.findFirst({
+            where: {
+              email: {
+                equals: normalizedEmail,
+                mode: 'insensitive',
+              },
+              isActive: true,
+            },
+            include: {
+              assignments: {
+                include: {
+                  role: true,
+                },
+              },
+            },
+          }));
 
         if (!user?.passwordHash) {
           return null;
@@ -142,6 +162,7 @@ export const authOptions: NextAuthOptions = {
       const token = 'token' in message ? message.token : null;
       const jti = token?.sessionJti as string | undefined;
       if (!jti) return;
+      const redis = getRedisClient();
       if (!redis) return;
       await redis.del(`session:${jti}`);
     },

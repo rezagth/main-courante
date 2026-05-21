@@ -32,6 +32,8 @@ export async function POST(request: Request) {
   }
 
   const { name, domain, adminEmail, tempPassword, inviteEmails } = parsed.data;
+  const normalizedAdminEmail = adminEmail.trim().toLowerCase();
+  const normalizedInviteEmails = inviteEmails.map((email) => email.trim().toLowerCase());
   const code = domain.toUpperCase().replace(/[^A-Z0-9]/g, '_').slice(0, 32);
   const passwordHash = await hashArgon2(tempPassword);
 
@@ -42,7 +44,7 @@ export async function POST(request: Request) {
     const admin = await tx.user.create({
       data: {
         tenantId: tenant.id,
-        email: adminEmail,
+        email: normalizedAdminEmail,
         firstName: 'Admin',
         lastName: name,
         passwordHash,
@@ -72,7 +74,7 @@ export async function POST(request: Request) {
     return { tenant, admin };
   });
 
-  for (const email of inviteEmails) {
+  for (const email of normalizedInviteEmails) {
     const url = await createInvitationLink(result.tenant.id, email, result.admin.id);
     await sendMail(
       email,

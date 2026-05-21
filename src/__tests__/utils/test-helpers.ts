@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { hash as hashArgon2 } from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import { DEFAULT_ROLE_PERMISSIONS } from '@/lib/rbac';
 
 let prismaInstance: PrismaClient;
 
@@ -23,23 +24,38 @@ export function getPrisma(): PrismaClient {
 export async function cleanupDatabase() {
   const prisma = getPrisma();
   await prisma.$executeRawUnsafe(`
+    DELETE FROM "audit_logs" WHERE 1=1;
+    DELETE FROM "impersonation_sessions" WHERE 1=1;
+    DELETE FROM "backup_runs" WHERE 1=1;
+    DELETE FROM "archived_entries" WHERE 1=1;
+    DELETE FROM "tenant_api_keys" WHERE 1=1;
+    DELETE FROM "tenant_invitations" WHERE 1=1;
+    DELETE FROM "tenant_onboarding_checklists" WHERE 1=1;
+    DELETE FROM "tenant_retention_policies" WHERE 1=1;
+    DELETE FROM "tenant_quotas" WHERE 1=1;
+    DELETE FROM "tenant_feature_flags" WHERE 1=1;
+    DELETE FROM "tenant_sso_providers" WHERE 1=1;
     DELETE FROM "team_members" WHERE 1=1;
+    DELETE FROM "site_manager_assignments" WHERE 1=1;
+    DELETE FROM "user_location_assignments" WHERE 1=1;
     DELETE FROM "user_role_assignments" WHERE 1=1;
     DELETE FROM "role_permissions" WHERE 1=1;
     DELETE FROM "entrees_main_courante" WHERE 1=1;
     DELETE FROM "types_evenement" WHERE 1=1;
+    DELETE FROM "locations" WHERE 1=1;
+    DELETE FROM "team_members" WHERE 1=1;
     DELETE FROM "teams" WHERE 1=1;
+    DELETE FROM "users" WHERE 1=1;
     DELETE FROM "sites" WHERE 1=1;
     DELETE FROM "permissions" WHERE 1=1;
     DELETE FROM "roles" WHERE 1=1;
-    DELETE FROM "users" WHERE 1=1;
     DELETE FROM "tenants" WHERE 1=1;
   `);
 }
 
 export async function createTestTenant() {
   const prisma = getPrisma();
-  return await prisma.tenant.create({
+  const tenant = await prisma.tenant.create({
     data: {
       code: 'TEST-TENANT-' + Date.now(),
       name: 'Test Tenant ' + Date.now(),
@@ -58,8 +74,27 @@ export async function createTestTenant() {
           archiveYears: 7,
         },
       },
+      onboarding: {
+        create: {
+          siteCreated: true,
+          teamCreated: true,
+          agentInvited: true,
+        },
+      },
+    },
+    include: {
+      quotas: true,
+      retentionPolicy: true,
+      onboarding: true,
     },
   });
+
+  return {
+    ...tenant,
+    quotas: tenant.quotas ? [tenant.quotas] : [],
+    retentionPolicy: tenant.retentionPolicy ? [tenant.retentionPolicy] : [],
+    onboarding: tenant.onboarding ? [tenant.onboarding] : [],
+  };
 }
 
 export async function createTestRoles(tenantId: string) {
@@ -104,6 +139,8 @@ export async function createTestPermissions(tenantId: string) {
     { resource: 'TENANT', action: 'CREATE', code: 'TENANT:CREATE' },
     { resource: 'SITE', action: 'MANAGE', code: 'SITE:MANAGE' },
     { resource: 'ROLE', action: 'MANAGE', code: 'ROLE:MANAGE' },
+    { resource: 'LOCATION', action: 'MANAGE', code: 'LOCATION:MANAGE' },
+    { resource: 'AGENT_ASSIGNMENT', action: 'MANAGE', code: 'AGENT_ASSIGNMENT:MANAGE' },
   ];
 
   for (const def of permissionDefs) {
@@ -118,6 +155,41 @@ export async function createTestPermissions(tenantId: string) {
   }
 
   return permissions;
+}
+
+export async function seedDefaultRolePermissions(
+  tenantId: string,
+  roles: any,
+  permissions: Record<string, any>,
+) {
+  const prisma = getPrisma();
+
+  for (const [roleCode, permissionCodes] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {
+    const role = roles[roleCode];
+    if (!role) continue;
+
+    for (const permissionCode of permissionCodes) {
+      const permission = permissions[permissionCode];
+      if (!permission) continue;
+
+      await prisma.rolePermission.upsert({
+        where: {
+          tenantId_roleId_permissionId: {
+            tenantId,
+            roleId: role.id,
+            permissionId: permission.id,
+          },
+        },
+        create: {
+          tenantId,
+          roleId: role.id,
+          permissionId: permission.id,
+          allowed: true,
+        },
+        update: { allowed: true },
+      });
+    }
+  }
 }
 
 export async function createTestUser(
@@ -257,6 +329,7 @@ export async function setupTestContext(): Promise<TestContext> {
   const tenant = await createTestTenant();
   const roles = await createTestRoles(tenant.id);
   const permissions = await createTestPermissions(tenant.id);
+  await seedDefaultRolePermissions(tenant.id, roles, permissions);
 
   // Create test users for each role
   const users = {

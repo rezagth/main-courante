@@ -3,6 +3,7 @@ import { fetchServerJson } from '@/lib/server-json';
 import { auth } from '@/lib/auth';
 import { hasAnyRole, resolveDefaultDashboardPath } from '@/lib/role-routing';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 
 type ChefPayload = { recent: Array<{ id: string; timestamp: string; description: string; user: { firstName: string; lastName: string } }> };
 
@@ -18,13 +19,13 @@ export default async function ChefAnalyticsActivityPage() {
       <Panel title="Flux récent">
         <div className="space-y-2">
           {(data?.recent ?? []).map((entry) => (
-            <div key={entry.id} className="rounded-xl border border-white/5 bg-white/[0.02] p-3 text-sm text-zinc-300">
+            <Link key={entry.id} href={`/entries/${entry.id}`} className="block rounded-xl border border-white/5 bg-white/[0.02] p-3 text-sm text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.05]">
               <div className="flex items-center justify-between">
                 <span>{entry.description}</span>
                 <span className="text-zinc-500">{new Date(entry.timestamp).toLocaleString()}</span>
               </div>
               <p className="mt-1 text-zinc-400">{entry.user.firstName} {entry.user.lastName}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </Panel>
