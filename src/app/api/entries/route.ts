@@ -24,7 +24,7 @@ function normalizeOptionalText(value: FormDataEntryValue | null): string | undef
 }
 
 export async function GET(request: Request) {
-  const user = await requirePermission('ENTRY:READ');
+  const user = await requirePermission('ENTRY:READ', { request });
   const { searchParams } = new URL(request.url);
   const take = Math.min(Number(searchParams.get('take') ?? '20'), 50);
   const page = Math.max(Number(searchParams.get('page') ?? '0'), 0);
@@ -112,7 +112,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requirePermission('ENTRY:CREATE');
+  const user = await requirePermission('ENTRY:CREATE', { request });
   const contentType = request.headers.get('content-type') ?? '';
   const isMultipart = contentType.includes('multipart/form-data');
 

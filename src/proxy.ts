@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { getBearerTokenFromRequest } from '@/lib/auth';
 import { resolveDefaultDashboardPath } from '@/lib/role-routing';
 
-const PUBLIC_API_PREFIXES = ['/api/auth', '/api/status', '/api/v1/openapi'];
+const PUBLIC_API_PREFIXES = ['/api/auth', '/api/status', '/api/v1/openapi', '/api/mobile/auth'];
 const PUBLIC_PATHS = ['/login', '/status'];
 const ROLE_PROTECTED_PATHS: Array<{ prefix: string; roles: string[] }> = [
   { prefix: '/agent', roles: ['AGENT', 'SUPER_ADMIN'] },
@@ -37,6 +38,10 @@ async function handleProxy(request: NextRequest) {
 
   if (!hasSessionCookie(request)) {
     if (pathname.startsWith('/api')) {
+      const bearerToken = await getBearerTokenFromRequest(request);
+      if (bearerToken) {
+        return NextResponse.next();
+      }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.redirect(new URL('/login', request.url));

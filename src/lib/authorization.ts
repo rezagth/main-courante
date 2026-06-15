@@ -1,19 +1,30 @@
-import { auth } from '@/lib/auth';
+import { auth, getAuthUserFromRequest, type SessionUser } from '@/lib/auth';
 import { hasDynamicPermission, assertResourceBelongsToTenant } from '@/lib/rbac-db';
 import { logAuditEvent } from '@/lib/audit';
 import { prismaAdmin } from '@/lib/prisma';
 
-export async function requirePermission(permission: string, context?: { siteId?: string; teamId?: string }) {
+async function resolveAuthUser(request?: Request): Promise<SessionUser | null> {
+  if (request) {
+    return getAuthUserFromRequest(request);
+  }
   const session = await auth();
-  if (!session?.user) {
+  return session?.user ?? null;
+}
+
+export async function requirePermission(
+  permission: string,
+  context?: { siteId?: string; teamId?: string; request?: Request },
+) {
+  const user = await resolveAuthUser(context?.request);
+  if (!user) {
     throw new Error('Unauthorized');
   }
 
   const allowed = await hasDynamicPermission({
-    tenantId: session.user.tenantId,
-    userId: session.user.id,
+    tenantId: user.tenantId,
+    userId: user.id,
     permission,
-    siteId: context?.siteId ?? session.user.siteId ?? undefined,
+    siteId: context?.siteId ?? user.siteId ?? undefined,
     teamId: context?.teamId,
   });
 
@@ -21,7 +32,7 @@ export async function requirePermission(permission: string, context?: { siteId?:
     throw new Error(`Forbidden: missing permission ${permission}`);
   }
 
-  return session.user;
+  return user;
 }
 
 export async function assertTenantResourceOwnership(
