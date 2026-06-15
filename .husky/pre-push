@@ -1,0 +1,18 @@
+#!/bin/bash
+
+protected_branch='main'
+
+while read local_ref local_sha remote_ref remote_sha
+do
+    if [[ "$remote_ref" == *"refs/heads/$protected_branch" ]] || [[ "$local_ref" == *"refs/heads/$protected_branch" ]]
+    then
+        echo -e "\033[0;31m==========================================================================\033[0m"
+        echo -e "\033[0;31mErreur : Vous essayez de pusher sur la branche protégée '$protected_branch'.\033[0m"
+        echo -e "\033[0;31mVeuillez créer une branche et passer par une Merge Request / Pull Request.\033[0m"
+        echo -e "\033[0;33m(Si c'est une urgence et que vous devez forcer, utilisez 'git push --no-verify')\033[0m"
+        echo -e "\033[0;31m==========================================================================\033[0m"
+        exit 1
+    fi
+done
+
+exit 0

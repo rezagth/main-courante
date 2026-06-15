@@ -18,7 +18,8 @@
     "ops:swagger": "node scripts/swagger-server.mjs",
     "bootstrap:dev": "node scripts/bootstrap-dev.mjs",
     "db:wipe": "prisma db execute --file ./scripts/wipe-db.sql",
-    "create:agent": "node scripts/create-agent.mjs"
+    "create:agent": "node scripts/create-agent.mjs",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=20"
