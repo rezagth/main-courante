@@ -58,7 +58,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
         run: pnpm test:run
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v7
         with:
           files: ./coverage/coverage-final.json
           fail_ci_if_error: false
