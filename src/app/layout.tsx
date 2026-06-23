@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,6 +35,7 @@ export default function RootLayout({
         <PostHogProvider>
           <TooltipProvider>{children}</TooltipProvider>
         </PostHogProvider>
+        <Analytics />
       </body>
     </html>
   );
