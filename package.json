@@ -31,7 +31,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
-    "@sentry/nextjs": "^10.17.0",
+    "@sentry/nextjs": "^10.64.0",
     "@tanstack/react-table": "^8.21.3",
     "@vercel/analytics": "^2.0.1",
     "argon2": "^0.44.0",
@@ -44,7 +44,7 @@
     "ioredis": "^5.10.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.8.0",
-    "next": "16.2.3",
+    "next": "16.2.10",
     "next-auth": "^4.24.11",
     "node-cron": "^4.2.1",
     "papaparse": "^5.5.3",
@@ -73,14 +73,14 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^4.2.1",
-    "@vitest/coverage-v8": "^1.1.0",
-    "@vitest/ui": "^1.1.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/ui": "^4.1.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "prisma": "^7.7.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^1.1.0"
+    "vitest": "^4.1.10"
   }
 }
